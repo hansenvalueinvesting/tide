@@ -13,6 +13,7 @@
   --paper:#f6f0ea; --paper-2:#efe6dd; --ink:#3a2d33; --ink-soft:#6b5a60;
   --plum:#7d4f66; --plum-deep:#5c3a4d; --rose:#c88b9a; --rose-soft:#e7c9d0;
   --fertile:#6f8a7d; --fertile-soft:#cfe0d7; --ovul:#4a6d8c;
+  --follic:#c99a5b; --follic-soft:#ecdcc0; --luteal:#9b7aa0; --luteal-soft:#ddcfe0;
   --line:#e2d4c9; --danger:#b0574f;
   --shadow:0 1px 3px rgba(90,58,77,.08),0 6px 20px rgba(90,58,77,.08);
   --r:16px;
@@ -32,8 +33,9 @@ input,select,textarea{font-family:inherit;font-size:16px}
 
 /* ---------- APP SHELL ---------- */
 #app{max-width:480px;margin:0 auto;padding:0 18px 120px}
-header{padding:22px 0 12px;display:flex;align-items:baseline;justify-content:space-between}
-header h1{font-size:28px;letter-spacing:-.5px}
+header{padding:22px 0 12px}
+header h1{font-size:26px;letter-spacing:-.5px;line-height:1.15}
+.hsub{margin-top:4px;font-size:14px;color:var(--ink-soft)}
 
 /* ---------- RING ---------- */
 .ring-wrap{position:relative;width:100%;aspect-ratio:1;max-width:320px;margin:6px auto 4px}
@@ -51,7 +53,6 @@ header h1{font-size:28px;letter-spacing:-.5px}
   font-size:16px;font-weight:600;box-shadow:var(--shadow);transition:.12s;margin-bottom:12px}
 .cta:active{transform:scale(.99);background:var(--plum-deep)}
 .cta.ghost{background:var(--paper-2);color:var(--plum-deep)}
-.cta.end{background:var(--rose)}
 
 /* ---------- STAT STRIP ---------- */
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 20px}
@@ -75,6 +76,8 @@ header h1{font-size:28px;letter-spacing:-.5px}
 .cell.today{outline:2px solid var(--plum);outline-offset:-2px;font-weight:600}
 .cell.period{background:var(--rose);color:#fff}
 .cell.predicted{background:repeating-linear-gradient(45deg,var(--rose-soft),var(--rose-soft) 4px,transparent 4px,transparent 8px)}
+.cell.follicular{background:var(--follic-soft)}
+.cell.luteal{background:var(--luteal-soft)}
 .cell.fertile{background:var(--fertile-soft)}
 .cell.ovul{background:var(--ovul);color:#fff}
 .cell .logdot{position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:var(--plum-deep)}
@@ -110,6 +113,14 @@ nav button svg{width:22px;height:22px}
 .field input[type=number],.field input[type=text],.field textarea{width:100%;padding:12px;border-radius:12px;
   border:1.5px solid var(--line);background:var(--paper-2)}
 .field textarea{resize:vertical;min-height:60px}
+.field label .sval{float:right;text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:var(--plum)}
+.slider{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:6px;
+  background:var(--paper-2);outline:none;margin:2px 0}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;border-radius:50%;
+  background:var(--plum);border:3px solid var(--paper);box-shadow:var(--shadow);cursor:pointer}
+.slider::-moz-range-thumb{width:26px;height:26px;border:3px solid var(--paper);border-radius:50%;
+  background:var(--plum);box-shadow:var(--shadow);cursor:pointer}
+.slider-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-soft);margin-top:8px}
 .row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .save-row{display:flex;gap:10px;margin-top:8px}
 .save-row .cta{margin-bottom:0}
@@ -132,7 +143,8 @@ nav button svg{width:22px;height:22px}
 <!-- ============ APP ============ -->
 <div id="app" class="hidden">
   <header>
-    <h1 id="greeting">Tide</h1>
+    <h1 id="hTitle">Tide</h1>
+    <div class="hsub" id="hSub"></div>
   </header>
 
   <!-- HOME -->
@@ -147,13 +159,13 @@ nav button svg{width:22px;height:22px}
     </div>
     <div class="legend">
       <span><i class="swatch" style="background:var(--rose)"></i>Period</span>
+      <span><i class="swatch" style="background:var(--follic-soft)"></i>Follicular</span>
       <span><i class="swatch" style="background:var(--fertile)"></i>Fertile</span>
       <span><i class="swatch" style="background:var(--ovul)"></i>Ovulation</span>
-      <span><i class="swatch" style="background:var(--rose-soft)"></i>Predicted</span>
+      <span><i class="swatch" style="background:var(--luteal-soft)"></i>Luteal</span>
     </div>
 
-    <button class="cta" id="periodToggle">Log period start</button>
-    <button class="cta ghost" id="logTodayBtn">Log symptoms for today</button>
+    <button class="cta" id="checkinBtn">Daily check-in</button>
 
     <div class="stats">
       <div class="stat"><b id="stAvg">–</b><small>avg cycle</small></div>
@@ -229,6 +241,9 @@ nav button svg{width:22px;height:22px}
 <script>
 /* ================= CONFIG ================= */
 const DEFAULT_CYCLE=28, DEFAULT_PERIOD=5, LUTEAL=14, FERTILE_PRE=5, FERTILE_POST=1;
+// Cervical-mucus signals used to detect ovulation from daily check-ins
+const FERTILE_MUCUS=['Egg-white','Watery'];
+const PHASE_LABEL={menstruation:'Menstruation',follicular:'Follicular',fertile:'Fertile window',ovulation:'Ovulation',luteal:'Luteal'};
 const DB_NAME='tide-db', STORE='days', META='meta';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const iso=d=>{const x=new Date(d);x.setHours(12,0,0,0);return x.toISOString().slice(0,10)};
@@ -296,27 +311,44 @@ function currentPeriodStart(){
 }
 function lastStart(){const s=periodStarts();return s.length?s[s.length-1]:null;}
 
-// Predictions from last known start
+// Symptom-based ovulation: latest fertile-mucus day this cycle (after the period, up to today).
+// Egg-white is the peak fertility sign, so it wins over plain "watery" if both are logged.
+function observedOvul(ls,cyc,per){
+  const lo=addDays(ls,per), hi=addDays(ls,cyc), t=today();
+  const days=Object.keys(DAYS).filter(dt=>dt>=lo&&dt<hi&&dt<=t&&FERTILE_MUCUS.includes(DAYS[dt].discharge)).sort();
+  const egg=days.filter(dt=>DAYS[dt].discharge==='Egg-white');
+  const src=egg.length?egg:days;
+  return src.length?src[src.length-1]:null;
+}
+
+// Predictions from last known start, refined by tracked symptoms when available
 function predictions(){
   const ls=lastStart(); if(!ls)return null;
   const cyc=avgCycle(), per=avgPeriod();
-  const nextStart=addDays(ls,cyc);
-  const ovul=addDays(nextStart,-LUTEAL);
+  const obs=observedOvul(ls,cyc,per);
+  const ovul=obs||addDays(ls,cyc-LUTEAL);
+  // A confirmed ovulation fixes next period ~14d later (luteal length is the stable part)
+  const nextStart=obs?addDays(ovul,LUTEAL):addDays(ls,cyc);
   const fertileStart=addDays(ovul,-FERTILE_PRE);
   const fertileEnd=addDays(ovul,FERTILE_POST);
-  return {ls,cyc,per,nextStart,ovul,fertileStart,fertileEnd};
+  return {ls,cyc,per,nextStart,ovul,fertileStart,fertileEnd,ovulObserved:!!obs};
 }
 function cycleDay(){
   const ls=lastStart(); if(!ls)return null;
   return daysBetween(ls,today())+1;
 }
+// Phase of any date within the current cycle: menstruation → follicular → fertile/ovulation → luteal
+function dayPhase(dateStr){
+  if(DAYS[dateStr]?.period)return 'menstruation';
+  const p=predictions(); if(!p)return null;
+  if(dateStr>=p.fertileStart&&dateStr<=p.fertileEnd)return dateStr===p.ovul?'ovulation':'fertile';
+  if(dateStr>p.ovul)return 'luteal';
+  if(dateStr>=p.ls)return daysBetween(p.ls,dateStr)<p.per?'menstruation':'follicular';
+  return null;
+}
 function phaseName(){
-  const cd=cycleDay(); if(!cd)return 'Getting started';
-  const p=predictions(); const t=today();
-  if(currentPeriodStart())return 'Menstruation';
-  if(t>=p.fertileStart&&t<=p.fertileEnd)return t===p.ovul?'Ovulation':'Fertile window';
-  if(cd<=p.cyc-LUTEAL)return 'Follicular phase';
-  return 'Luteal phase';
+  const ph=dayPhase(today());
+  return ph?PHASE_LABEL[ph]:'Getting started';
 }
 
 /* ================= RENDER: RING ================= */
@@ -325,15 +357,13 @@ function renderRing(){
   const cd=cycleDay();
   const cx=100,cy=100,r=82,tau=2*Math.PI;
   const p=predictions();
-  // classify each cycle-day 1..cyc
+  // classify each cycle-day 1..cyc by its phase
   function classForDay(n){ // n is cycle day (1-based)
-    const date=p?addDays(p.ls,n-1):null;
     if(!p)return 'idle';
-    if(date>=p.fertileStart&&date<=p.fertileEnd){ if(date===p.ovul)return 'ovul'; return 'fertile'; }
-    if(n<=avgPeriod())return 'period';
-    return 'idle';
+    return dayPhase(addDays(p.ls,n-1))||'idle';
   }
-  const colors={period:'var(--rose)',fertile:'var(--fertile-soft)',ovul:'var(--ovul)',idle:'var(--paper-2)'};
+  const colors={menstruation:'var(--rose)',follicular:'var(--follic-soft)',fertile:'var(--fertile-soft)',
+    ovulation:'var(--ovul)',luteal:'var(--luteal-soft)',idle:'var(--paper-2)'};
   let html='';
   const gap=0.012;
   for(let n=1;n<=cyc;n++){
@@ -363,9 +393,18 @@ function renderStats(){
   if(p){const n=daysBetween(today(),p.nextStart);
     $('#stNext').textContent=n>0?n+'d':(n===0?'today':'now');}
   else $('#stNext').textContent='–';
-  // toggle button label
-  $('#periodToggle').textContent=currentPeriodStart()?'Log period end (today)':'Log period start (today)';
-  $('#periodToggle').classList.toggle('end',!!currentPeriodStart());
+}
+
+/* ================= RENDER: HEADER ================= */
+function renderHeader(){
+  const cd=cycleDay(), p=predictions();
+  const title=$('#hTitle'), sub=$('#hSub');
+  if(!cd||!p){title.textContent='Tide';sub.textContent='Log a period to begin';return;}
+  title.textContent=`Day ${cd} of ${phaseName()}`;
+  if(currentPeriodStart()){sub.textContent='';return;}   // in period → drop next-period line
+  const n=daysBetween(today(),p.nextStart);
+  sub.textContent=n>0?`Next period in ${n} day${n===1?'':'s'}`
+    :n===0?'Next period expected today':'Period may be late';
 }
 
 /* ================= RENDER: CALENDAR ================= */
@@ -373,7 +412,13 @@ function dayClasses(dateStr){
   const c=[]; const d=DAYS[dateStr]; const p=predictions();
   if(d?.period)c.push('period');
   if(p){
-    if(dateStr>=p.fertileStart&&dateStr<=p.fertileEnd&&!d?.period)c.push('fertile');
+    // full-cycle phase shading for the current cycle
+    if(dateStr>=p.ls&&dateStr<p.nextStart&&!d?.period){
+      const ph=dayPhase(dateStr);
+      if(ph==='follicular')c.push('follicular');
+      else if(ph==='luteal')c.push('luteal');
+      else if(ph==='fertile')c.push('fertile');
+    }
     if(dateStr===p.ovul)c.push('ovul');
     // predicted future periods (up to 3 cycles out)
     for(let k=0;k<=3;k++){
@@ -384,7 +429,7 @@ function dayClasses(dateStr){
   if(dateStr===today())c.push('today');
   return c;
 }
-function hasLog(d){return d&&(d.symptoms?.length||d.mood?.length||d.sex?.length||d.discharge||d.bbt||d.weight||d.note);}
+function hasLog(d){return d&&(d.symptoms?.length||d.mood||d.energy||d.discharge||d.note||d.sex?.length||d.bbt||d.weight);}
 function renderCalendar(){
   const dows=['S','M','T','W','T','F','S'];
   $('#calDow').innerHTML=dows.map(x=>`<div class="dow">${x}</div>`).join('');
@@ -421,17 +466,13 @@ function renderHistory(){
   $('#hCount').textContent=lens.length;
 }
 
-function renderAll(){renderRing();renderStats();renderCalendar();renderHistory();
-  const h=new Date().getHours();
-  $('#greeting').textContent=h<12?'Good morning':h<18?'Good afternoon':'Good evening';
-}
+function renderAll(){renderHeader();renderRing();renderStats();renderCalendar();renderHistory();}
 
 /* ================= LOG SHEET ================= */
-const SYMPTOMS=['Cramps','Headache','Bloating','Tender breasts','Backache','Nausea','Fatigue','Acne','Cravings','Insomnia','Dizziness','Diarrhea'];
-const MOODS=['Happy','Calm','Energetic','Sensitive','Sad','Anxious','Irritable','Low'];
-const SEX=['None','Protected','Unprotected','High drive','Low drive'];
-const FLOW=['Spotting','Light','Medium','Heavy'];
+const SYMPTOMS=['Cramps','Headache','Bloating','Tender breasts','Backache','Nausea','Fatigue','Cravings','Acne'];
 const DISCHARGE=['None','Sticky','Creamy','Egg-white','Watery'];
+const MOOD_WORDS={1:'Awful',2:'Low',3:'Okay',4:'Good',5:'Great'};
+const ENERGY_WORDS={1:'Drained',2:'Low',3:'Steady',4:'Lively',5:'Energized'};
 
 function chipRow(items,selected,cls=''){
   return items.map(x=>`<button class="chip ${cls} ${selected.includes(x)?'on':''}" data-v="${x}">${x}</button>`).join('');
@@ -439,26 +480,27 @@ function chipRow(items,selected,cls=''){
 function openLog(date){
   const d=DAYS[date]||{date};
   const isPeriod=!!d.period;
+  const mood0=(typeof d.mood==='number'&&d.mood>=1&&d.mood<=5)?d.mood:3;
+  const energy0=(typeof d.energy==='number'&&d.energy>=1&&d.energy<=5)?d.energy:3;
   const sheet=document.createElement('div');
   sheet.className='modal-bg';
   sheet.innerHTML=`<div class="sheet">
     <h2>${date===today()?'Today':fmtShort(date)}</h2>
     <div class="date-sub">${parse(date).toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
 
-    <div class="field"><label>Period</label>
+    <div class="field"><label>Period?</label>
       <div class="chips"><button class="chip rose ${isPeriod?'on':''}" id="pchip">${isPeriod?'Period day ✓':'Mark period day'}</button></div>
     </div>
-    <div class="field" id="flowField" ${isPeriod?'':'style="display:none"'}><label>Flow</label>
-      <div class="chips" id="flow">${chipRow(FLOW,d.flow?[d.flow]:[],'rose')}</div>
+    <div class="field"><label>Mood <span class="sval" id="moodVal">${MOOD_WORDS[mood0]}</span></label>
+      <input type="range" min="1" max="5" step="1" class="slider" id="mood" value="${mood0}">
+      <div class="slider-ends"><span>Down</span><span>Great</span></div>
     </div>
-    <div class="field"><label>Symptoms</label><div class="chips" id="sym">${chipRow(SYMPTOMS,d.symptoms||[])}</div></div>
-    <div class="field"><label>Mood</label><div class="chips" id="mood">${chipRow(MOODS,d.mood||[],'green')}</div></div>
+    <div class="field"><label>Energy <span class="sval" id="energyVal">${ENERGY_WORDS[energy0]}</span></label>
+      <input type="range" min="1" max="5" step="1" class="slider" id="energy" value="${energy0}">
+      <div class="slider-ends"><span>Low</span><span>High</span></div>
+    </div>
     <div class="field"><label>Discharge</label><div class="chips" id="disc">${chipRow(DISCHARGE,d.discharge?[d.discharge]:[],'green')}</div></div>
-    <div class="field"><label>Sex & libido</label><div class="chips" id="sex">${chipRow(SEX,d.sex||[])}</div></div>
-    <div class="field"><div class="row-2">
-      <div><label>Temp (BBT)</label><input type="number" step="0.01" id="bbt" placeholder="°" value="${d.bbt||''}"></div>
-      <div><label>Weight</label><input type="number" step="0.1" id="weight" placeholder="" value="${d.weight||''}"></div>
-    </div></div>
+    <div class="field"><label>Symptoms</label><div class="chips" id="sym">${chipRow(SYMPTOMS,d.symptoms||[])}</div></div>
     <div class="field"><label>Notes</label><textarea id="note" placeholder="Anything worth remembering">${d.note||''}</textarea></div>
 
     <div class="save-row">
@@ -471,16 +513,20 @@ function openLog(date){
   let periodOn=isPeriod;
   const pchip=sheet.querySelector('#pchip');
   pchip.onclick=()=>{periodOn=!periodOn;pchip.classList.toggle('on',periodOn);
-    pchip.textContent=periodOn?'Period day ✓':'Mark period day';
-    sheet.querySelector('#flowField').style.display=periodOn?'':'none';};
+    pchip.textContent=periodOn?'Period day ✓':'Mark period day';};
 
-  // single-select groups: flow, discharge
-  ['#flow','#disc'].forEach(sel=>sheet.querySelectorAll(sel+' .chip').forEach(c=>c.onclick=()=>{
+  // sliders: live descriptive label
+  const moodEl=sheet.querySelector('#mood'), energyEl=sheet.querySelector('#energy');
+  moodEl.oninput=()=>sheet.querySelector('#moodVal').textContent=MOOD_WORDS[moodEl.value];
+  energyEl.oninput=()=>sheet.querySelector('#energyVal').textContent=ENERGY_WORDS[energyEl.value];
+
+  // single-select: discharge
+  sheet.querySelectorAll('#disc .chip').forEach(c=>c.onclick=()=>{
     const was=c.classList.contains('on');
-    sheet.querySelectorAll(sel+' .chip').forEach(x=>x.classList.remove('on'));
-    if(!was)c.classList.add('on');}));
-  // multi-select: sym, mood, sex
-  ['#sym','#mood','#sex'].forEach(sel=>sheet.querySelectorAll(sel+' .chip').forEach(c=>c.onclick=()=>c.classList.toggle('on')));
+    sheet.querySelectorAll('#disc .chip').forEach(x=>x.classList.remove('on'));
+    if(!was)c.classList.add('on');});
+  // multi-select: symptoms
+  sheet.querySelectorAll('#sym .chip').forEach(c=>c.onclick=()=>c.classList.toggle('on'));
 
   const pick=sel=>[...sheet.querySelectorAll(sel+' .chip.on')].map(c=>c.dataset.v);
   const pick1=sel=>pick(sel)[0]||'';
@@ -488,32 +534,17 @@ function openLog(date){
   sheet.querySelector('#cancelLog').onclick=()=>sheet.remove();
   sheet.onclick=e=>{if(e.target===sheet)sheet.remove();};
   sheet.querySelector('#saveLog').onclick=async()=>{
-    const rec={date,period:periodOn,flow:pick1('#flow'),
-      symptoms:pick('#sym'),mood:pick('#mood'),sex:pick('#sex'),
-      discharge:pick1('#disc'),bbt:sheet.querySelector('#bbt').value,
-      weight:sheet.querySelector('#weight').value,note:sheet.querySelector('#note').value.trim()};
-    // if fully empty, delete the record
-    if(!rec.period&&!hasLog(rec)){await dbDel(STORE,date);delete DAYS[date];}
-    else{await dbPut(STORE,rec);DAYS[date]=rec;}
+    const rec={...(DAYS[date]||{}),date,period:periodOn,
+      mood:+moodEl.value,energy:+energyEl.value,
+      discharge:pick1('#disc'),symptoms:pick('#sym'),
+      note:sheet.querySelector('#note').value.trim()};
+    await dbPut(STORE,rec);DAYS[date]=rec;
     sheet.remove();renderAll();toast('Saved');
   };
 }
 
 /* ================= QUICK ACTIONS ================= */
-$('#logTodayBtn').onclick=()=>openLog(today());
-$('#periodToggle').onclick=async()=>{
-  const t=today();
-  const cur=currentPeriodStart();
-  if(cur){ // ending: just don't mark today; ensure today isn't a period day
-    if(DAYS[t]?.period){const r={...DAYS[t],period:false};
-      if(!hasLog(r)){await dbDel(STORE,t);delete DAYS[t];}else{await dbPut(STORE,r);DAYS[t]=r;}}
-    toast('Period ended');
-  }else{ // starting
-    const r={...(DAYS[t]||{date:t}),period:true};
-    await dbPut(STORE,r);DAYS[t]=r;toast('Period started');
-  }
-  renderAll();
-};
+$('#checkinBtn').onclick=()=>openLog(today());
 
 /* ================= NAV ================= */
 $$('#nav button').forEach(b=>b.onclick=()=>{
