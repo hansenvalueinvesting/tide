@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#2a1f2a">
 <title>Tide</title>
+<!-- PWA / add-to-home-screen -->
+<link id="manifest" rel="manifest">
+<link id="appleIcon" rel="apple-touch-icon">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Tide">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Tide">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -33,9 +41,17 @@ input,select,textarea{font-family:inherit;font-size:16px}
 
 /* ---------- APP SHELL ---------- */
 #app{max-width:480px;margin:0 auto;padding:0 18px 120px}
-header{padding:22px 0 12px}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:22px 0 12px}
 header h1{font-size:26px;letter-spacing:-.5px;line-height:1.15}
 .hsub{margin-top:4px;font-size:14px;color:var(--ink-soft)}
+.head-actions{display:flex;gap:8px;flex-shrink:0;margin-top:2px}
+.icon-btn{position:relative;width:40px;height:40px;border-radius:50%;background:var(--paper-2);
+  display:flex;align-items:center;justify-content:center;color:var(--plum-deep);box-shadow:var(--shadow);transition:.12s}
+.icon-btn:active{transform:scale(.92);background:var(--rose-soft)}
+.icon-btn svg{width:20px;height:20px}
+.badge{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;
+  background:var(--danger);color:#fff;font-size:10px;font-weight:600;line-height:17px;text-align:center;
+  border:2px solid var(--paper)}
 
 /* ---------- RING ---------- */
 .ring-wrap{position:relative;width:100%;aspect-ratio:1;max-width:320px;margin:6px auto 4px}
@@ -150,6 +166,31 @@ nav button svg{width:22px;height:22px}
 .sci-note{font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin-top:14px;
   background:var(--paper-2);padding:13px 15px;border-radius:12px}
 .sci-note b{color:var(--plum-deep);font-weight:600}
+
+/* ---------- UPDATES LOG ---------- */
+.upd-item{background:var(--paper-2);border-radius:14px;padding:14px 15px;margin-bottom:10px}
+.upd-item.unread{border-left:3px solid var(--plum)}
+.upd-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.upd-top b{font-size:15px;color:var(--ink)}
+.upd-tag{font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;
+  padding:2px 8px;border-radius:20px;background:var(--rose-soft);color:var(--plum-deep)}
+.upd-tag.fix{background:var(--fertile-soft);color:var(--fertile)}
+.upd-tag.improved{background:var(--follic-soft);color:#8a6a2f}
+.upd-date{margin-left:auto;font-size:11px;color:var(--ink-soft)}
+.upd-item p{margin:0;font-size:13px;color:var(--ink-soft);line-height:1.55}
+
+/* ---------- INSTALL GUIDE ---------- */
+.inst-steps{list-style:none;margin:6px 0 0;padding:0;counter-reset:step}
+.inst-steps li{position:relative;padding:12px 14px 12px 46px;background:var(--paper-2);
+  border-radius:12px;margin-bottom:8px;font-size:14px;line-height:1.5;color:var(--ink)}
+.inst-steps li::before{counter-increment:step;content:counter(step);position:absolute;left:12px;top:11px;
+  width:22px;height:22px;border-radius:50%;background:var(--plum);color:#fff;font-size:12px;font-weight:600;
+  display:flex;align-items:center;justify-content:center}
+.inst-ico{display:inline-flex;vertical-align:-4px;margin:0 2px;color:var(--plum-deep)}
+.inst-ico svg{width:17px;height:17px}
+.inst-lead{font-size:13.5px;color:var(--ink-soft);line-height:1.6;margin-bottom:16px}
+.inst-note{font-size:12px;color:var(--ink-soft);text-align:center;line-height:1.6;margin-top:14px}
+.inst-ok{text-align:center;padding:14px 10px;font-size:15px;color:var(--plum-deep);line-height:1.6}
 @media(prefers-reduced-motion){*{animation:none!important}}
 </style>
 </head>
@@ -158,8 +199,19 @@ nav button svg{width:22px;height:22px}
 <!-- ============ APP ============ -->
 <div id="app" class="hidden">
   <header>
-    <h1 id="hTitle">Tide</h1>
-    <div class="hsub" id="hSub"></div>
+    <div>
+      <h1 id="hTitle">Tide</h1>
+      <div class="hsub" id="hSub"></div>
+    </div>
+    <div class="head-actions">
+      <button class="icon-btn" id="installBtn" aria-label="Install app" title="Add to home screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      </button>
+      <button class="icon-btn" id="updatesBtn" aria-label="What's new" title="What's new">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="badge hidden" id="updBadge">0</span>
+      </button>
+    </div>
   </header>
 
   <!-- HOME -->
@@ -710,6 +762,150 @@ function openScience(){
 $('#checkinBtn').onclick=()=>openLog(today());
 $('#scienceLink').onclick=openScience;
 
+/* ================= UPDATES LOG (What's new) ================= */
+// The running changelog behind the bell icon. Add new releases to the TOP with the next
+// id up. Anything with an id above the reader's last-seen id shows as an unread badge.
+// tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
+const UPDATES=[
+  {id:5,date:'2026-07-11',tag:'New',title:'Install & What’s-new',
+   body:'Two new buttons up top: add Tide to your home screen for a full-screen, offline app, and tap the bell any time to see what’s changed — this log is where every new feature lands as Tide grows.'},
+  {id:4,date:'2026-07-11',tag:'New',title:'See the science',
+   body:'A “See the science” link on the home screen opens hormone, ovary and uterine-lining charts scaled to your own cycle. Also fixed the calendar so fertile days correctly share their colour with the follicular and luteal phases.'},
+  {id:3,date:'2026-07-11',tag:'Improved',title:'Overlapping phases',
+   body:'Calendar days that fall in two phases at once now show a neat diagonal split of both colours.'},
+  {id:2,date:'2026-07-11',tag:'Improved',title:'Smarter period predictions',
+   body:'After you log a period start, Tide now projects the rest of that period’s length from your history instead of waiting for you to finish logging it.'},
+  {id:1,date:'2026-07-11',tag:'New',title:'Welcome to Tide',
+   body:'Track your period, cycle phases and daily check-ins — mood, energy, symptoms and more — all stored privately on your device.'},
+];
+const SEEN_KEY='tide-updates-seen';
+const getSeen=()=>{try{return +localStorage.getItem(SEEN_KEY)||0}catch{return 0}};
+const setSeen=v=>{try{localStorage.setItem(SEEN_KEY,v)}catch{}};
+const latestUpdate=()=>UPDATES.reduce((m,u)=>Math.max(m,u.id),0);
+function renderBadge(){
+  const n=UPDATES.filter(u=>u.id>getSeen()).length;
+  const b=$('#updBadge'); b.textContent=n>9?'9+':n; b.classList.toggle('hidden',n===0);
+}
+function openUpdates(){
+  const seen=getSeen();
+  const items=UPDATES.map(u=>{
+    const tagCls=u.tag==='Fix'?'fix':u.tag==='Improved'?'improved':'';
+    return `<div class="upd-item ${u.id>seen?'unread':''}">
+      <div class="upd-top"><b>${u.title}</b><span class="upd-tag ${tagCls}">${u.tag}</span>
+        <span class="upd-date">${fmtShort(u.date)}</span></div>
+      <p>${u.body}</p></div>`;
+  }).join('');
+  const sheet=document.createElement('div');
+  sheet.className='modal-bg';
+  sheet.innerHTML=`<div class="sheet">
+    <h2>What’s new</h2>
+    <div class="date-sub">Every update to Tide, newest first.</div>
+    ${items}
+    <div class="save-row"><button class="cta" id="closeUpd">Done</button></div>
+  </div>`;
+  document.body.appendChild(sheet);
+  const close=()=>sheet.remove();
+  sheet.querySelector('#closeUpd').onclick=close;
+  sheet.onclick=e=>{if(e.target===sheet)close();};
+  // opening the log marks everything read
+  setSeen(latestUpdate()); renderBadge();
+}
+
+/* ================= INSTALL (add to home screen) ================= */
+let deferredPrompt=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;});
+addEventListener('appinstalled',()=>{deferredPrompt=null;toast('Tide installed');});
+const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+
+const shareIco=`<span class="inst-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span>`;
+const dotsIco=`<span class="inst-ico"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></span>`;
+
+function openInstall(){
+  const ua=navigator.userAgent||'';
+  const iOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const android=/Android/.test(ua);
+  let body;
+  if(isStandalone()){
+    body=`<div class="inst-ok">Tide is already installed on this device 🎉<br>Launch it from your home screen any time.</div>`;
+  }else if(deferredPrompt){
+    body=`<p class="inst-lead">Install Tide as an app — it opens full-screen, works offline, and keeps all your data on this device.</p>
+      <div class="save-row"><button class="cta" id="doInstall">Install Tide</button></div>`;
+  }else if(iOS){
+    body=`<p class="inst-lead">Add Tide to your home screen for a full-screen, offline app. In <b>Safari</b>:</p>
+      <ol class="inst-steps">
+        <li>Tap the <b>Share</b> button ${shareIco} in the toolbar.</li>
+        <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+        <li>Tap <b>Add</b> — Tide appears on your home screen.</li>
+      </ol>`;
+  }else if(android){
+    body=`<p class="inst-lead">Add Tide to your home screen for a full-screen, offline app. In <b>Chrome</b>:</p>
+      <ol class="inst-steps">
+        <li>Tap the <b>menu</b> ${dotsIco} (top-right).</li>
+        <li>Tap <b>Install app</b> (or <b>Add to Home screen</b>).</li>
+        <li>Confirm with <b>Install</b>.</li>
+      </ol>`;
+  }else{
+    body=`<p class="inst-lead">Install Tide as an app for a full-screen, offline experience. In <b>Chrome</b> or <b>Edge</b>:</p>
+      <ol class="inst-steps">
+        <li>Click the <b>install</b> icon in the address bar, or the <b>menu</b> ${dotsIco}.</li>
+        <li>Choose <b>Install Tide</b> (or <b>Apps → Install this site</b>).</li>
+        <li>Confirm — Tide opens in its own window.</li>
+      </ol>`;
+  }
+  const sheet=document.createElement('div');
+  sheet.className='modal-bg';
+  sheet.innerHTML=`<div class="sheet">
+    <h2>Add Tide to your home screen</h2>
+    <div class="date-sub">Use Tide like a native app — no app store needed.</div>
+    ${body}
+    <div class="inst-note">Everything stays on your device. Installing adds a shortcut and lets Tide run offline; it doesn’t create an account or send your data anywhere.</div>
+    <div class="save-row"><button class="cta ghost" id="closeInst">Close</button></div>
+  </div>`;
+  document.body.appendChild(sheet);
+  const close=()=>sheet.remove();
+  sheet.querySelector('#closeInst').onclick=close;
+  sheet.onclick=e=>{if(e.target===sheet)close();};
+  const di=sheet.querySelector('#doInstall');
+  if(di)di.onclick=async()=>{
+    close();
+    deferredPrompt.prompt();
+    try{await deferredPrompt.userChoice;}catch{}
+    deferredPrompt=null;
+  };
+}
+
+$('#installBtn').onclick=openInstall;
+$('#updatesBtn').onclick=openUpdates;
+
+/* ================= PWA: icon + manifest ================= */
+// Draw the app icon on a canvas so the whole app stays a single self-contained file —
+// a paper tile with the tide ring and a lowercase "t". Used for the manifest (Android /
+// desktop) and the apple-touch-icon (iOS home screen).
+function drawIcon(size){
+  const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');
+  x.fillStyle='#f6f0ea';x.fillRect(0,0,size,size);
+  const cx=size/2,r=size*0.30,lw=size*0.075;
+  x.lineWidth=lw;x.lineCap='round';
+  x.strokeStyle='#e7c9d0';x.beginPath();x.arc(cx,cx,r,0,Math.PI*2);x.stroke();       // faint full ring
+  x.strokeStyle='#7d4f66';x.beginPath();x.arc(cx,cx,r,-Math.PI*0.5,Math.PI*0.55);x.stroke(); // plum arc
+  x.fillStyle='#5c3a4d';x.font=`600 ${size*0.42}px Georgia, 'Times New Roman', serif`;
+  x.textAlign='center';x.textBaseline='middle';x.fillText('t',cx,cx+size*0.02);
+  return c.toDataURL('image/png');
+}
+function setupPWA(){
+  try{
+    $('#appleIcon').href=drawIcon(180);
+    const base=location.pathname.replace(/[^/]*$/,'');
+    const manifest={name:'Tide',short_name:'Tide',description:'Private, on-device period & cycle tracker',
+      start_url:location.pathname+location.search||'.',scope:base||'/',
+      display:'standalone',orientation:'portrait',background_color:'#f6f0ea',theme_color:'#2a1f2a',
+      icons:[{src:drawIcon(192),sizes:'192x192',type:'image/png',purpose:'any maskable'},
+             {src:drawIcon(512),sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
+    const blob=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
+    $('#manifest').href=URL.createObjectURL(blob);
+  }catch(e){/* canvas/manifest unsupported — the install guide still works */}
+}
+
 /* ================= NAV ================= */
 $$('#nav button').forEach(b=>b.onclick=()=>{
   const v=b.dataset.view;
@@ -764,6 +960,7 @@ function toast(msg){
   $('#app').classList.remove('hidden');$('#nav').classList.remove('hidden');
   calMonth=new Date();calMonth.setDate(1);
   renderAll();
+  setupPWA();renderBadge();
 })();
 </script>
 </body>
