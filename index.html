@@ -168,6 +168,10 @@ nav button svg{width:22px;height:22px}
 .sci-note b{color:var(--plum-deep);font-weight:600}
 
 /* ---------- UPDATES LOG ---------- */
+.sheet-flex{display:flex;flex-direction:column;overflow:hidden}
+.upd-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:2px -4px 0;padding:2px 4px}
+.upd-scroll .upd-item:last-child{margin-bottom:0}
+.sheet-flex .save-row{flex-shrink:0;margin-top:14px}
 .upd-item{background:var(--paper-2);border-radius:14px;padding:14px 15px;margin-bottom:10px}
 .upd-item.unread{border-left:3px solid var(--plum)}
 .upd-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
@@ -176,8 +180,8 @@ nav button svg{width:22px;height:22px}
   padding:2px 8px;border-radius:20px;background:var(--rose-soft);color:var(--plum-deep)}
 .upd-tag.fix{background:var(--fertile-soft);color:var(--fertile)}
 .upd-tag.improved{background:var(--follic-soft);color:#8a6a2f}
-.upd-date{margin-left:auto;font-size:11px;color:var(--ink-soft)}
-.upd-item p{margin:0;font-size:13px;color:var(--ink-soft);line-height:1.55}
+.upd-item p{margin:0 0 7px;font-size:13px;color:var(--ink-soft);line-height:1.55}
+.upd-time{font-size:11px;color:var(--ink-soft);letter-spacing:.02em}
 
 /* ---------- INSTALL GUIDE ---------- */
 .inst-steps{list-style:none;margin:6px 0 0;padding:0;counter-reset:step}
@@ -764,20 +768,26 @@ $('#scienceLink').onclick=openScience;
 
 /* ================= UPDATES LOG (What's new) ================= */
 // The running changelog behind the bell icon. Add new releases to the TOP with the next
-// id up. Anything with an id above the reader's last-seen id shows as an unread badge.
-// tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
+// id up, and set `ts` to the exact posting time as an ISO string (Boston / Eastern, the
+// -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
+// shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
-  {id:5,date:'2026-07-11',tag:'New',title:'Install & What’s-new',
+  {id:6,ts:'2026-07-11T02:46:29-04:00',tag:'Improved',title:'Timestamps & tidier install',
+   body:'Each update now shows the exact time it went live, in Boston time. The What’s-new list scrolls on its own so the Done button always stays put, and the install guide now makes clear you can add Tide to your home screen from any browser’s share menu — not just Safari.'},
+  {id:5,ts:'2026-07-11T02:39:51-04:00',tag:'New',title:'Install & What’s-new',
    body:'Two new buttons up top: add Tide to your home screen for a full-screen, offline app, and tap the bell any time to see what’s changed — this log is where every new feature lands as Tide grows.'},
-  {id:4,date:'2026-07-11',tag:'New',title:'See the science',
+  {id:4,ts:'2026-07-11T02:11:36-04:00',tag:'New',title:'See the science',
    body:'A “See the science” link on the home screen opens hormone, ovary and uterine-lining charts scaled to your own cycle. Also fixed the calendar so fertile days correctly share their colour with the follicular and luteal phases.'},
-  {id:3,date:'2026-07-11',tag:'Improved',title:'Overlapping phases',
+  {id:3,ts:'2026-07-11T01:58:01-04:00',tag:'Improved',title:'Overlapping phases',
    body:'Calendar days that fall in two phases at once now show a neat diagonal split of both colours.'},
-  {id:2,date:'2026-07-11',tag:'Improved',title:'Smarter period predictions',
+  {id:2,ts:'2026-07-11T01:50:14-04:00',tag:'Improved',title:'Smarter period predictions',
    body:'After you log a period start, Tide now projects the rest of that period’s length from your history instead of waiting for you to finish logging it.'},
-  {id:1,date:'2026-07-11',tag:'New',title:'Welcome to Tide',
+  {id:1,ts:'2026-07-11T01:40:02-04:00',tag:'New',title:'Welcome to Tide',
    body:'Track your period, cycle phases and daily check-ins — mood, energy, symptoms and more — all stored privately on your device.'},
 ];
+// Always render the posting time in Boston (Eastern) time, whatever the viewer's timezone.
+const fmtUpdate=ts=>new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',
+  month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(ts));
 const SEEN_KEY='tide-updates-seen';
 const getSeen=()=>{try{return +localStorage.getItem(SEEN_KEY)||0}catch{return 0}};
 const setSeen=v=>{try{localStorage.setItem(SEEN_KEY,v)}catch{}};
@@ -791,16 +801,16 @@ function openUpdates(){
   const items=UPDATES.map(u=>{
     const tagCls=u.tag==='Fix'?'fix':u.tag==='Improved'?'improved':'';
     return `<div class="upd-item ${u.id>seen?'unread':''}">
-      <div class="upd-top"><b>${u.title}</b><span class="upd-tag ${tagCls}">${u.tag}</span>
-        <span class="upd-date">${fmtShort(u.date)}</span></div>
-      <p>${u.body}</p></div>`;
+      <div class="upd-top"><b>${u.title}</b><span class="upd-tag ${tagCls}">${u.tag}</span></div>
+      <p>${u.body}</p>
+      <div class="upd-time">${fmtUpdate(u.ts)}</div></div>`;
   }).join('');
   const sheet=document.createElement('div');
   sheet.className='modal-bg';
-  sheet.innerHTML=`<div class="sheet">
+  sheet.innerHTML=`<div class="sheet sheet-flex">
     <h2>What’s new</h2>
     <div class="date-sub">Every update to Tide, newest first.</div>
-    ${items}
+    <div class="upd-scroll">${items}</div>
     <div class="save-row"><button class="cta" id="closeUpd">Done</button></div>
   </div>`;
   document.body.appendChild(sheet);
@@ -831,18 +841,18 @@ function openInstall(){
     body=`<p class="inst-lead">Install Tide as an app — it opens full-screen, works offline, and keeps all your data on this device.</p>
       <div class="save-row"><button class="cta" id="doInstall">Install Tide</button></div>`;
   }else if(iOS){
-    body=`<p class="inst-lead">Add Tide to your home screen for a full-screen, offline app. In <b>Safari</b>:</p>
+    body=`<p class="inst-lead">Add Tide to your home screen for a full-screen, offline app — this works from <b>any browser</b> on your iPhone or iPad, not just Safari:</p>
       <ol class="inst-steps">
-        <li>Tap the <b>Share</b> button ${shareIco} in the toolbar.</li>
-        <li>Scroll down and tap <b>Add to Home Screen</b>.</li>
+        <li>Tap the <b>Share</b> button ${shareIco} in your browser's toolbar.</li>
+        <li>Scroll down the share menu and tap <b>Add to Home Screen</b>.</li>
         <li>Tap <b>Add</b> — Tide appears on your home screen.</li>
       </ol>`;
   }else if(android){
-    body=`<p class="inst-lead">Add Tide to your home screen for a full-screen, offline app. In <b>Chrome</b>:</p>
+    body=`<p class="inst-lead">Add Tide to your home screen for a full-screen, offline app. In <b>any browser</b>:</p>
       <ol class="inst-steps">
-        <li>Tap the <b>menu</b> ${dotsIco} (top-right).</li>
-        <li>Tap <b>Install app</b> (or <b>Add to Home screen</b>).</li>
-        <li>Confirm with <b>Install</b>.</li>
+        <li>Tap the <b>menu</b> ${dotsIco} (or the <b>Share</b> button ${shareIco}).</li>
+        <li>Tap <b>Install app</b> or <b>Add to Home screen</b>.</li>
+        <li>Confirm with <b>Install</b> / <b>Add</b>.</li>
       </ol>`;
   }else{
     body=`<p class="inst-lead">Install Tide as an app for a full-screen, offline experience. In <b>Chrome</b> or <b>Edge</b>:</p>
