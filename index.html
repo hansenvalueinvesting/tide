@@ -135,6 +135,21 @@ nav button svg{width:22px;height:22px}
 .privacy-note{font-size:12px;color:var(--ink-soft);text-align:center;padding:20px 10px;line-height:1.6}
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--plum-deep);color:#fff;
   padding:12px 20px;border-radius:24px;font-size:14px;z-index:60;box-shadow:var(--shadow);animation:up .2s}
+
+/* ---------- SEE THE SCIENCE ---------- */
+.science-link{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;
+  margin:28px 0 4px;padding:12px;font-size:14px;font-weight:500;color:var(--plum);
+  border-radius:var(--r);background:none}
+.science-link span.arw{transition:transform .15s}
+.science-link:active{background:var(--paper-2)}
+.science-link:active span.arw{transform:translateX(4px)}
+.sci-fig{width:100%;height:auto;display:block;margin:4px 0 2px}
+.sci-legend{display:flex;flex-wrap:wrap;gap:9px 16px;justify-content:center;margin:12px 0 2px;font-size:12px;color:var(--ink-soft)}
+.sci-legend span{display:flex;align-items:center;gap:6px}
+.sci-legend i{width:15px;height:3px;border-radius:2px;display:inline-block}
+.sci-note{font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin-top:14px;
+  background:var(--paper-2);padding:13px 15px;border-radius:12px}
+.sci-note b{color:var(--plum-deep);font-weight:600}
 @media(prefers-reduced-motion){*{animation:none!important}}
 </style>
 </head>
@@ -181,6 +196,8 @@ nav button svg{width:22px;height:22px}
       <div class="grid" id="calDow"></div>
       <div class="grid" id="calGrid"></div>
     </div>
+
+    <button class="science-link" id="scienceLink">See the science <span class="arw">→</span></button>
   </section>
 
   <!-- HISTORY -->
@@ -416,9 +433,10 @@ function renderHeader(){
 
 /* ================= RENDER: CALENDAR ================= */
 // The phase "blocks" a calendar day belongs to, in cycle order. Most days sit in one
-// phase, but some genuinely overlap two — ovulation happens inside the fertile window,
-// and a period day can land in the fertile window on a short cycle. Two blocks are
-// drawn as a diagonal half-and-half of each phase's colour.
+// phase, but some genuinely overlap two — the fertile window straddles ovulation, so its
+// pre-ovulation days are still follicular and its post-ovulation days are already luteal.
+// A period day can also land in the fertile window on a short cycle. Two blocks are drawn
+// as a diagonal half-and-half of each phase's colour.
 function dayBlocks(dateStr){
   const p=predictions(); const d=DAYS[dateStr]; const t=today();
   const logged=!!d?.period; const b=[];
@@ -429,10 +447,14 @@ function dayBlocks(dateStr){
     let proj=inCur&&dateStr<addDays(p.ls,p.per);
     for(let k=0;k<=3&&!proj;k++){const ps=addDays(p.nextStart,k*p.cyc);if(dateStr>=ps&&dateStr<addDays(ps,p.per))proj=true;}
     if(!logged&&proj&&dateStr>t)b.push({cls:'predicted',color:'var(--rose-soft)'});
-    if(!logged&&inCur&&dateStr>=addDays(p.ls,p.per)&&dateStr<p.fertileStart)b.push({cls:'follicular',color:'var(--follic-soft)'});
+    // Follicular runs from the end of the period up to (but not including) ovulation, so
+    // its final days overlap the front half of the fertile window.
+    if(!logged&&inCur&&dateStr>=addDays(p.ls,p.per)&&dateStr<p.ovul)b.push({cls:'follicular',color:'var(--follic-soft)'});
     if(!logged&&dateStr>=p.fertileStart&&dateStr<=p.fertileEnd)b.push({cls:'fertile',color:'var(--fertile-soft)'}); // ovulation day is fertile too
     if(dateStr===p.ovul)b.push({cls:'ovul',color:'var(--ovul)'});
-    if(!logged&&inCur&&dateStr>p.fertileEnd)b.push({cls:'luteal',color:'var(--luteal-soft)'});
+    // Luteal runs from just after ovulation to the next period, so its first day or two
+    // overlap the tail of the fertile window.
+    if(!logged&&inCur&&dateStr>p.ovul)b.push({cls:'luteal',color:'var(--luteal-soft)'});
   }
   return b.slice(0,2);
 }
@@ -554,8 +576,139 @@ function openLog(date){
   };
 }
 
+/* ================= THE SCIENCE ================= */
+// A cycle "model" for the science charts: the biological anchors (period length,
+// ovulation day, fertile window, luteal length) expressed as cycle-days, derived from
+// the same predictions the rest of the app uses. Falls back to a textbook 28-day cycle
+// when nothing has been logged yet.
+function cycleModel(){
+  const p=predictions();
+  if(p){
+    const cyc=Math.max(daysBetween(p.ls,p.nextStart),16);
+    const per=Math.max(Math.min(p.per,cyc-6),2);
+    const ov=Math.min(Math.max(daysBetween(p.ls,p.ovul)+1,per+2),cyc-3);
+    const fS=Math.min(Math.max(daysBetween(p.ls,p.fertileStart)+1,per+1),ov-1);
+    const fE=Math.max(Math.min(daysBetween(p.ls,p.fertileEnd)+1,cyc-1),ov+1);
+    const cd=cycleDay();
+    return {cyc,per,ov,fS,fE,lut:cyc-ov,cd:(cd>=1&&cd<=cyc)?cd:null,observed:p.ovulObserved,hasData:true};
+  }
+  return {cyc:28,per:5,ov:14,fS:9,fE:15,lut:14,cd:null,observed:false,hasData:false};
+}
+
+// Build the stacked, time-aligned SVG: hormones + ovary on top, uterine lining below,
+// both sharing one x-axis (cycle day) so the two cycles line up in time. Hormone/lining
+// levels are idealized curves scaled to this person's cycle length and ovulation timing.
+function scienceSVG(m){
+  const {cyc,per,ov,fS,fE,lut,cd}=m;
+  const W=360, ML=30, MR=14, PW=W-ML-MR;
+  const C1T=26, C1H=118;                 // hormone plot
+  const OVT=C1T+C1H+10, OVH=26;          // ovary (follicle) band
+  const C2T=OVT+OVH+30, C2H=76;          // uterine-lining plot
+  const AX=C2T+C2H;                       // shared x-axis baseline
+  const H=AX+40;
+  const bandTop=C1T, bandBot=C2T+C2H;
+  const xf=d=>ML+((d-1)/(cyc-1))*PW;
+  const clamp=(v,a,b)=>Math.min(Math.max(v,a),b);
+  const G=(x,mu,sig)=>Math.exp(-((x-mu)*(x-mu))/(2*sig*sig));
+  const S=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
+
+  // ---- idealized hormone curves (0..1), stretched to fit this cycle ----
+  const fw=Math.max(cyc*0.10,2), lw=Math.max(lut*0.5,2);
+  const E=d=>clamp(0.10+0.85*G(d,ov-1,fw)+0.42*G(d,ov+lut*0.5,lw),0,1);      // estrogen
+  const L=d=>clamp(0.10+0.92*G(d,ov,1.1),0,1);                               // LH surge
+  const F=d=>clamp(0.14+0.26*G(d,2,4)+0.32*G(d,ov,1.5),0,1);                 // FSH
+  const P=d=>clamp(0.06+clamp((d-(ov-1))/2,0,1)*0.88*G(d,ov+lut*0.45,Math.max(lut*0.45,2)),0,1); // progesterone
+  // uterine lining thickness: sheds during the period, rebuilds (proliferative), thickens
+  // further (secretory), then thins right before the next period.
+  const U=d=>{
+    if(d<=per){const t=(d-1)/Math.max(per,1);return 0.26-0.14*t;}
+    if(d<=ov){const t=(d-per)/Math.max(ov-per,1);return 0.12+0.46*S(t);}
+    const t=(d-ov)/Math.max(cyc-ov,1);
+    return clamp(0.58+0.40*S(Math.min(t*1.5,1))-0.16*S(clamp((t-0.72)/0.28,0,1)),0,1);
+  };
+
+  const line=(fn,top,h)=>{let s='';const N=120;for(let i=0;i<=N;i++){const d=1+(cyc-1)*i/N;
+    s+=(i?'L':'M')+xf(d).toFixed(1)+' '+(top+(1-clamp(fn(d),0,1))*h).toFixed(1)+' ';}return s.trim();};
+  const areaU=(top,h)=>{let s=`M${xf(1).toFixed(1)} ${(top+h).toFixed(1)} `;const N=120;
+    for(let i=0;i<=N;i++){const d=1+(cyc-1)*i/N;s+=`L${xf(d).toFixed(1)} ${(top+(1-clamp(U(d),0,1))*h).toFixed(1)} `;}
+    return s+`L${xf(cyc).toFixed(1)} ${(top+h).toFixed(1)} Z`;};
+
+  // ---- phase backdrop bands (match the home-screen legend colours) ----
+  const band=(d0,d1,fill,op)=>{const x0=xf(clamp(d0,1,cyc)),x1=xf(clamp(d1,1,cyc));
+    return `<rect x="${x0.toFixed(1)}" y="${bandTop}" width="${(x1-x0).toFixed(1)}" height="${bandBot-bandTop}" fill="${fill}" opacity="${op}"/>`;};
+  let bg=band(1,per,'var(--rose)',.13)+band(per,fS,'var(--follic-soft)',.55)
+        +band(fS,fE,'var(--fertile-soft)',.7)+band(fE,cyc,'var(--luteal-soft)',.55);
+  // ovulation guide + today marker span both charts so the timing reads across them
+  bg+=`<line x1="${xf(ov).toFixed(1)}" y1="${C1T}" x2="${xf(ov).toFixed(1)}" y2="${AX}" stroke="var(--ovul)" stroke-width="1.2" stroke-dasharray="3 3" opacity=".75"/>`;
+  bg+=`<text x="${xf(ov).toFixed(1)}" y="${C1T-14}" text-anchor="middle" font-size="9" fill="var(--ovul)">ovulation</text>`;
+  if(cd)bg+=`<line x1="${xf(cd).toFixed(1)}" y1="${C1T}" x2="${xf(cd).toFixed(1)}" y2="${AX}" stroke="var(--plum-deep)" stroke-width="1.2" stroke-dasharray="1 3" opacity=".8"/>`
+        +`<text x="${xf(cd).toFixed(1)}" y="${AX+37}" text-anchor="middle" font-size="8.5" fill="var(--plum-deep)" font-weight="600">today</text>`;
+
+  // ---- ovary band: maturing follicle → ovulation → corpus luteum ----
+  const oy=OVT+OVH/2; let ovary='';
+  for(let i=1;i<=4;i++){const d=per+(ov-per)*i/5,r=1.6+3.4*i/4;
+    ovary+=`<circle cx="${xf(d).toFixed(1)}" cy="${oy}" r="${r.toFixed(1)}" fill="var(--follic-soft)" stroke="var(--follic)" stroke-width="1.2"/>`;}
+  ovary+=`<circle cx="${xf(ov).toFixed(1)}" cy="${oy}" r="4.4" fill="var(--ovul)"/>`
+        +`<circle cx="${(xf(ov)+7).toFixed(1)}" cy="${(oy-1).toFixed(1)}" r="2.2" fill="var(--rose)"/>`
+        +`<circle cx="${xf(ov+lut*0.35).toFixed(1)}" cy="${oy}" r="5" fill="var(--follic)" opacity=".9"/>`
+        +`<circle cx="${xf(ov+lut*0.75).toFixed(1)}" cy="${oy}" r="3" fill="var(--follic)" opacity=".45"/>`;
+
+  // ---- hormone curves ----
+  const curve=(fn,col)=>`<path d="${line(fn,C1T,C1H)}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const hormones=curve(F,'var(--follic)')+curve(E,'var(--plum)')+curve(P,'var(--luteal)')+curve(L,'var(--ovul)');
+
+  // ---- uterine lining ----
+  const lining=`<path d="${areaU(C2T,C2H)}" fill="var(--rose-soft)" opacity=".8"/>`
+              +`<path d="${line(U,C2T,C2H)}" fill="none" stroke="var(--rose)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+  // ---- axes, ticks, labels ----
+  const baseline=(top,h)=>`<line x1="${ML}" y1="${(top+h).toFixed(1)}" x2="${W-MR}" y2="${(top+h).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
+  let axis=baseline(C1T,C1H)+baseline(C2T,C2H);
+  const ticks=[...new Set([1,per,ov,cyc].map(Math.round))].sort((a,b)=>a-b);
+  ticks.forEach(d=>{axis+=`<line x1="${xf(d).toFixed(1)}" y1="${AX}" x2="${xf(d).toFixed(1)}" y2="${AX+4}" stroke="var(--ink-soft)" stroke-width="1"/>`
+    +`<text x="${xf(d).toFixed(1)}" y="${AX+15}" text-anchor="middle" font-size="9" fill="var(--ink-soft)">${d}</text>`;});
+  axis+=`<text x="${(ML+PW/2).toFixed(1)}" y="${AX+37}" text-anchor="middle" font-size="9" fill="var(--ink-soft)">cycle day</text>`;
+  // phase labels centred under each band
+  [['Period',(1+per)/2],['Follicular',(per+fS)/2],['Fertile',(fS+fE)/2],['Luteal',(fE+cyc)/2]]
+    .forEach(([t,d])=>axis+=`<text x="${xf(d).toFixed(1)}" y="${AX+27}" text-anchor="middle" font-size="8.5" fill="var(--ink-soft)">${t}</text>`);
+  // section + axis captions
+  const caps=`<text x="${ML}" y="14" font-size="11" font-weight="600" fill="var(--ink)" style="font-family:'Fraunces',serif">Hormones &amp; ovary</text>`
+    +`<text x="${ML}" y="${(OVT+OVH+18).toFixed(1)}" font-size="11" font-weight="600" fill="var(--ink)" style="font-family:'Fraunces',serif">Uterine lining</text>`
+    +`<text x="11" y="${(C1T+C1H/2).toFixed(1)}" transform="rotate(-90 11 ${(C1T+C1H/2).toFixed(1)})" text-anchor="middle" font-size="8" fill="var(--ink-soft)">level</text>`
+    +`<text x="11" y="${(C2T+C2H/2).toFixed(1)}" transform="rotate(-90 11 ${(C2T+C2H/2).toFixed(1)})" text-anchor="middle" font-size="8" fill="var(--ink-soft)">thickness</text>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" class="sci-fig" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Hormone, ovary and uterine cycle charts aligned by cycle day">${bg}${ovary}${hormones}${lining}${axis}${caps}</svg>`;
+}
+
+function openScience(){
+  const m=cycleModel();
+  const note=m.hasData
+    ? `These are idealized curves scaled to <b>your</b> data — a <b>${m.cyc}-day</b> cycle with a <b>${m.per}-day</b> period. Ovulation is ${m.observed?'estimated from your discharge logs':'projected'} around <b>day ${m.ov}</b>, which anchors the hormone peaks, the fertile window and the lining's growth. The dotted line marks today. Keep logging — especially cervical mucus — to sharpen the timing.`
+    : `This shows a textbook <b>28-day</b> cycle. Log a period start — and daily discharge — and every curve will re-scale to your own rhythm and predicted ovulation day.`;
+  const sheet=document.createElement('div');
+  sheet.className='modal-bg';
+  sheet.innerHTML=`<div class="sheet">
+    <h2>The science of your cycle</h2>
+    <div class="date-sub">Two cycles, one clock — hormones and ovary up top, the uterine lining below, aligned day-by-day.</div>
+    ${scienceSVG(m)}
+    <div class="sci-legend">
+      <span><i style="background:var(--plum)"></i>Estrogen</span>
+      <span><i style="background:var(--luteal)"></i>Progesterone</span>
+      <span><i style="background:var(--ovul)"></i>LH</span>
+      <span><i style="background:var(--follic)"></i>FSH</span>
+      <span><i style="background:var(--rose)"></i>Lining</span>
+    </div>
+    <div class="sci-note">${note}</div>
+    <div class="save-row"><button class="cta" id="closeSci">Got it</button></div>
+  </div>`;
+  document.body.appendChild(sheet);
+  sheet.querySelector('#closeSci').onclick=()=>sheet.remove();
+  sheet.onclick=e=>{if(e.target===sheet)sheet.remove();};
+}
+
 /* ================= QUICK ACTIONS ================= */
 $('#checkinBtn').onclick=()=>openLog(today());
+$('#scienceLink').onclick=openScience;
 
 /* ================= NAV ================= */
 $$('#nav button').forEach(b=>b.onclick=()=>{
