@@ -415,26 +415,26 @@ function renderHeader(){
 }
 
 /* ================= RENDER: CALENDAR ================= */
-function dayClasses(dateStr){
-  const c=[]; const d=DAYS[dateStr]; const p=predictions();
-  if(d?.period)c.push('period');
+// The phase "blocks" a calendar day belongs to, in cycle order. Most days sit in one
+// phase, but some genuinely overlap two — ovulation happens inside the fertile window,
+// and a period day can land in the fertile window on a short cycle. Two blocks are
+// drawn as a diagonal half-and-half of each phase's colour.
+function dayBlocks(dateStr){
+  const p=predictions(); const d=DAYS[dateStr]; const t=today();
+  const logged=!!d?.period; const b=[];
+  if(logged)b.push({cls:'period',color:'var(--rose)'});
   if(p){
-    // full-cycle phase shading for the current cycle
-    if(dateStr>=p.ls&&dateStr<p.nextStart&&!d?.period){
-      const ph=dayPhase(dateStr);
-      if(ph==='follicular')c.push('follicular');
-      else if(ph==='luteal')c.push('luteal');
-      else if(ph==='fertile')c.push('fertile');
-    }
-    if(dateStr===p.ovul)c.push('ovul');
-    // projected period days: the current cycle's remaining period, plus up to 3 cycles out
-    const starts=[p.ls]; for(let k=0;k<=3;k++)starts.push(addDays(p.nextStart,k*p.cyc));
-    for(const ps of starts){
-      if(dateStr>=ps&&dateStr<addDays(ps,p.per)&&dateStr>today()&&!d?.period)c.push('predicted');
-    }
+    const inCur=dateStr>=p.ls&&dateStr<p.nextStart;
+    // projected period: current cycle's remaining days, or up to 3 future cycles out
+    let proj=inCur&&dateStr<addDays(p.ls,p.per);
+    for(let k=0;k<=3&&!proj;k++){const ps=addDays(p.nextStart,k*p.cyc);if(dateStr>=ps&&dateStr<addDays(ps,p.per))proj=true;}
+    if(!logged&&proj&&dateStr>t)b.push({cls:'predicted',color:'var(--rose-soft)'});
+    if(!logged&&inCur&&dateStr>=addDays(p.ls,p.per)&&dateStr<p.fertileStart)b.push({cls:'follicular',color:'var(--follic-soft)'});
+    if(!logged&&dateStr>=p.fertileStart&&dateStr<=p.fertileEnd)b.push({cls:'fertile',color:'var(--fertile-soft)'}); // ovulation day is fertile too
+    if(dateStr===p.ovul)b.push({cls:'ovul',color:'var(--ovul)'});
+    if(!logged&&inCur&&dateStr>p.fertileEnd)b.push({cls:'luteal',color:'var(--luteal-soft)'});
   }
-  if(dateStr===today())c.push('today');
-  return c;
+  return b.slice(0,2);
 }
 function hasLog(d){return d&&(d.symptoms?.length||d.mood||d.energy||d.discharge||d.note||d.sex?.length||d.bbt||d.weight);}
 function renderCalendar(){
@@ -447,8 +447,12 @@ function renderCalendar(){
   for(let i=0;i<start;i++)html+='<div class="cell blank"></div>';
   for(let d=1;d<=dim;d++){
     const ds=iso(new Date(y,m,d));
-    const cls=dayClasses(ds);
-    html+=`<div class="cell ${cls.join(' ')}" data-date="${ds}">${d}${hasLog(DAYS[ds])?'<span class="logdot"></span>':''}</div>`;
+    const blocks=dayBlocks(ds); const cls=['cell']; let style='';
+    if(blocks.length>=2){cls.push('overlap');
+      style=` style="background:linear-gradient(135deg,${blocks[0].color} 0 50%,${blocks[1].color} 50% 100%)"`;}
+    else if(blocks.length===1)cls.push(blocks[0].cls);
+    if(ds===today())cls.push('today');
+    html+=`<div class="${cls.join(' ')}"${style} data-date="${ds}">${d}${hasLog(DAYS[ds])?'<span class="logdot"></span>':''}</div>`;
   }
   $('#calGrid').innerHTML=html;
   $$('#calGrid .cell:not(.blank)').forEach(c=>c.onclick=()=>openLog(c.dataset.date));
