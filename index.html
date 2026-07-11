@@ -816,6 +816,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:10,ts:'2026-07-11T17:10:00-04:00',tag:'Fix',title:'A clearer browser-tab icon',
+   body:'The Tide wave now shows up crisply on your browser tab. The old mark was too fine to read at that tiny size, so the tab version is now a bolder wave on a rounded gradient tile — the same look you already see when you add Tide to your home screen.'},
   {id:9,ts:'2026-07-11T16:05:00-04:00',tag:'Improved',title:'Period ends detected automatically',
    body:'When you check in on the day after your period and don’t mark it as a period day, Tide now recognises the period has ended — instead of assuming it’s still going. Your average period length, cycle stats and calendar stay accurate without any “end period” step.'},
   {id:8,ts:'2026-07-11T14:20:00-04:00',tag:'New',title:'Track intimacy',
@@ -960,6 +962,23 @@ function logoSVG(gid){
     +`<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="10" y1="10" x2="90" y2="90">${stops}</linearGradient>`
     +`</defs>${ring}${paths}</svg>`;
 }
+// A browser tab renders the favicon at ~16px, where the detailed thin-stroke ring above
+// collapses into an illegible smudge. So the tab icon gets its own bolder variant: the
+// gradient poured into a rounded tile with a few thick white wave strokes — high contrast
+// on both light and dark tab strips, and still clearly a cresting wave when tiny.
+const FAV_WAVES=[
+  'M22 46 C34 31 52 31 64 44 C71 51 67 61 58 59',   // crest curl
+  'M22 64 C39 55 55 60 68 64 C76 67 82 64 84 60',   // water line
+  'M28 80 C42 73 56 76 68 79',                       // foam line
+];
+function faviconSVG(gid){
+  const stops=GRAD_STOPS.map(([o,c])=>`<stop offset="${o}" stop-color="${c}"/>`).join('');
+  const waves=FAV_WAVES.map(d=>`<path d="${d}"/>`).join('');
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs>`
+    +`<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="6" y1="6" x2="94" y2="94">${stops}</linearGradient></defs>`
+    +`<rect x="2" y="2" width="96" height="96" rx="26" fill="url(#${gid})"/>`
+    +`<g fill="none" stroke="#fdf6ee" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">${waves}</g></svg>`;
+}
 // Rasterized icon for install: the same wave on the app's paper tile.
 function drawIcon(size){
   const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');
@@ -978,7 +997,7 @@ function setupPWA(){
   // SVG logo → header mark + browser-tab favicon (no canvas needed)
   try{
     $('#logoMark').innerHTML=logoSVG('tideGrad');
-    $('#favicon').href='data:image/svg+xml,'+encodeURIComponent(logoSVG('tideGradFav'));
+    $('#favicon').href='data:image/svg+xml,'+encodeURIComponent(faviconSVG('tideGradFav'));
   }catch(e){}
   // Rasterized icons → apple-touch-icon + web manifest for add-to-home-screen
   try{
@@ -1044,11 +1063,12 @@ function toast(msg){
 
 /* ================= BOOT ================= */
 (async function(){
+  setupPWA();   // logo + favicon first — doesn't need the DB, so the tab icon shows instantly
   await openDB();await loadAll();
   $('#app').classList.remove('hidden');$('#nav').classList.remove('hidden');
   calMonth=new Date();calMonth.setDate(1);
   renderAll();
-  setupPWA();renderBadge();
+  renderBadge();
 })();
 </script>
 </body>
