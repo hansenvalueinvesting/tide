@@ -144,6 +144,15 @@ nav button svg{width:22px;height:22px}
   background:var(--plum);box-shadow:var(--shadow);cursor:pointer}
 .slider-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-soft);margin-top:8px}
 .row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.check-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.checkbox{display:flex;align-items:center;gap:10px;padding:14px;border-radius:14px;background:var(--paper-2);
+  border:1.5px solid transparent;font-size:15px;font-weight:500;color:var(--ink);transition:.12s}
+.checkbox .cbox{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;transition:.12s}
+.checkbox .cbox::after{content:"✓";font-size:14px;line-height:1;color:#fff;opacity:0;transition:.12s}
+.checkbox.on{background:var(--rose-soft);border-color:var(--rose)}
+.checkbox.on .cbox{background:var(--rose);border-color:var(--rose)}
+.checkbox.on .cbox::after{opacity:1}
 .save-row{display:flex;gap:10px;margin-top:8px}
 .save-row .cta{margin-bottom:0}
 
@@ -593,8 +602,12 @@ function openLog(date){
     <h2>${date===today()?'Today':fmtShort(date)}</h2>
     <div class="date-sub">${parse(date).toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
 
-    <div class="field"><label>Period?</label>
-      <div class="chips"><button class="chip rose ${isPeriod?'on':''}" id="pchip">${isPeriod?'Period day ✓':'Mark period day'}</button></div>
+    <div class="field">
+      <div class="check-row">
+        <button class="checkbox ${isPeriod?'on':''}" id="pchip"><span class="cbox"></span><span>Period</span></button>
+        <button class="checkbox ${sexOn0?'on':''}" id="sexchip"><span class="cbox"></span><span>Sex</span></button>
+      </div>
+      <div class="chips ${sexOn0?'':'hidden'}" id="sexProt" style="margin-top:10px">${chipRow(SEX_PROT,sexProt0,'rose')}</div>
     </div>
     <div class="field"><label>Mood <span class="sval" id="moodVal">${MOOD_WORDS[mood0]}</span></label>
       <input type="range" min="1" max="5" step="1" class="slider" id="mood" value="${mood0}">
@@ -606,10 +619,6 @@ function openLog(date){
     </div>
     <div class="field"><label>Discharge</label><div class="chips" id="disc">${chipRow(DISCHARGE,d.discharge?[d.discharge]:[],'green')}</div></div>
     <div class="field"><label>Symptoms</label><div class="chips" id="sym">${chipRow(SYMPTOMS,d.symptoms||[])}</div></div>
-    <div class="field"><label>Sex</label>
-      <div class="chips"><button class="chip rose ${sexOn0?'on':''}" id="sexchip">${sexOn0?'Had sex ♥':'Mark sex'}</button></div>
-      <div class="chips ${sexOn0?'':'hidden'}" id="sexProt" style="margin-top:8px">${chipRow(SEX_PROT,sexProt0,'rose')}</div>
-    </div>
     <div class="field"><label>Notes</label><textarea id="note" placeholder="Anything worth remembering">${d.note||''}</textarea></div>
 
     <div class="save-row">
@@ -621,8 +630,7 @@ function openLog(date){
 
   let periodOn=isPeriod;
   const pchip=sheet.querySelector('#pchip');
-  pchip.onclick=()=>{periodOn=!periodOn;pchip.classList.toggle('on',periodOn);
-    pchip.textContent=periodOn?'Period day ✓':'Mark period day';};
+  pchip.onclick=()=>{periodOn=!periodOn;pchip.classList.toggle('on',periodOn);};
 
   // sliders: live descriptive label
   const moodEl=sheet.querySelector('#mood'), energyEl=sheet.querySelector('#energy');
@@ -641,12 +649,11 @@ function openLog(date){
   let sexOn=sexOn0;
   const sexchip=sheet.querySelector('#sexchip'), sexProtBox=sheet.querySelector('#sexProt');
   sexchip.onclick=()=>{sexOn=!sexOn;sexchip.classList.toggle('on',sexOn);
-    sexchip.textContent=sexOn?'Had sex ♥':'Mark sex';
     sexProtBox.classList.toggle('hidden',!sexOn);
     if(!sexOn)sexProtBox.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));};
   sexProtBox.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
     c.classList.toggle('on');
-    if(!sexOn){sexOn=true;sexchip.classList.add('on');sexchip.textContent='Had sex ♥';}});
+    if(!sexOn){sexOn=true;sexchip.classList.add('on');}});
 
   const pick=sel=>[...sheet.querySelectorAll(sel+' .chip.on')].map(c=>c.dataset.v);
   const pick1=sel=>pick(sel)[0]||'';
