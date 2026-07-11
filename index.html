@@ -101,6 +101,8 @@ header h1{font-size:26px;letter-spacing:-.5px;line-height:1.15}
 .cell.fertile{background:var(--fertile-soft)}
 .cell.ovul{background:var(--ovul);color:#fff}
 .cell .logdot{position:absolute;bottom:3px;width:4px;height:4px;border-radius:50%;background:var(--plum-deep)}
+.cell .sexheart{position:absolute;top:1px;right:2px;font-size:10px;line-height:1;color:#e75a92;
+  text-shadow:0 0 1.5px #fff,0 0 1.5px #fff,0 0 1.5px #fff;pointer-events:none}
 .cell:active{transform:scale(.9)}
 
 /* ---------- HISTORY ---------- */
@@ -537,7 +539,8 @@ function renderCalendar(){
       style=` style="background:linear-gradient(135deg,${blocks[0].color} 0 50%,${blocks[1].color} 50% 100%)"`;}
     else if(blocks.length===1)cls.push(blocks[0].cls);
     if(ds===today())cls.push('today');
-    html+=`<div class="${cls.join(' ')}"${style} data-date="${ds}">${d}${hasLog(DAYS[ds])?'<span class="logdot"></span>':''}</div>`;
+    const heart=DAYS[ds]?.sex?.length?'<span class="sexheart">♥</span>':'';
+    html+=`<div class="${cls.join(' ')}"${style} data-date="${ds}">${d}${heart}${hasLog(DAYS[ds])?'<span class="logdot"></span>':''}</div>`;
   }
   $('#calGrid').innerHTML=html;
   $$('#calGrid .cell:not(.blank)').forEach(c=>c.onclick=()=>openLog(c.dataset.date));
@@ -567,6 +570,9 @@ function renderAll(){renderHeader();renderRing();renderStats();renderCalendar();
 /* ================= LOG SHEET ================= */
 const SYMPTOMS=['Cramps','Headache','Bloating','Tender breasts','Backache','Nausea','Fatigue','Cravings','Acne'];
 const DISCHARGE=['None','Sticky','Creamy','Egg-white','Watery'];
+// Optional protection detail shown once "had sex" is toggled on. Stored in the day's
+// sex[] array; an empty toggle still records ['Yes'] so the calendar heart shows.
+const SEX_PROT=['Protected','Unprotected','Withdrawal'];
 const MOOD_WORDS={1:'Awful',2:'Low',3:'Okay',4:'Good',5:'Great'};
 const ENERGY_WORDS={1:'Drained',2:'Low',3:'Steady',4:'Lively',5:'Energized'};
 
@@ -578,6 +584,9 @@ function openLog(date){
   const isPeriod=!!d.period;
   const mood0=(typeof d.mood==='number'&&d.mood>=1&&d.mood<=5)?d.mood:3;
   const energy0=(typeof d.energy==='number'&&d.energy>=1&&d.energy<=5)?d.energy:3;
+  const sexArr=Array.isArray(d.sex)?d.sex:[];
+  const sexOn0=sexArr.length>0;
+  const sexProt0=sexArr.filter(v=>SEX_PROT.includes(v));
   const sheet=document.createElement('div');
   sheet.className='modal-bg';
   sheet.innerHTML=`<div class="sheet">
@@ -597,6 +606,10 @@ function openLog(date){
     </div>
     <div class="field"><label>Discharge</label><div class="chips" id="disc">${chipRow(DISCHARGE,d.discharge?[d.discharge]:[],'green')}</div></div>
     <div class="field"><label>Symptoms</label><div class="chips" id="sym">${chipRow(SYMPTOMS,d.symptoms||[])}</div></div>
+    <div class="field"><label>Sex</label>
+      <div class="chips"><button class="chip rose ${sexOn0?'on':''}" id="sexchip">${sexOn0?'Had sex ♥':'Mark sex'}</button></div>
+      <div class="chips ${sexOn0?'':'hidden'}" id="sexProt" style="margin-top:8px">${chipRow(SEX_PROT,sexProt0,'rose')}</div>
+    </div>
     <div class="field"><label>Notes</label><textarea id="note" placeholder="Anything worth remembering">${d.note||''}</textarea></div>
 
     <div class="save-row">
@@ -624,15 +637,28 @@ function openLog(date){
   // multi-select: symptoms
   sheet.querySelectorAll('#sym .chip').forEach(c=>c.onclick=()=>c.classList.toggle('on'));
 
+  // sex: a yes/no toggle that reveals optional protection chips when on
+  let sexOn=sexOn0;
+  const sexchip=sheet.querySelector('#sexchip'), sexProtBox=sheet.querySelector('#sexProt');
+  sexchip.onclick=()=>{sexOn=!sexOn;sexchip.classList.toggle('on',sexOn);
+    sexchip.textContent=sexOn?'Had sex ♥':'Mark sex';
+    sexProtBox.classList.toggle('hidden',!sexOn);
+    if(!sexOn)sexProtBox.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));};
+  sexProtBox.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+    c.classList.toggle('on');
+    if(!sexOn){sexOn=true;sexchip.classList.add('on');sexchip.textContent='Had sex ♥';}});
+
   const pick=sel=>[...sheet.querySelectorAll(sel+' .chip.on')].map(c=>c.dataset.v);
   const pick1=sel=>pick(sel)[0]||'';
 
   sheet.querySelector('#cancelLog').onclick=()=>sheet.remove();
   sheet.onclick=e=>{if(e.target===sheet)sheet.remove();};
   sheet.querySelector('#saveLog').onclick=async()=>{
+    const sexProt=[...sexProtBox.querySelectorAll('.chip.on')].map(c=>c.dataset.v);
+    const sex=sexOn?(sexProt.length?sexProt:['Yes']):[];
     const rec={...(DAYS[date]||{}),date,period:periodOn,
       mood:+moodEl.value,energy:+energyEl.value,
-      discharge:pick1('#disc'),symptoms:pick('#sym'),
+      discharge:pick1('#disc'),symptoms:pick('#sym'),sex,
       note:sheet.querySelector('#note').value.trim()};
     await dbPut(STORE,rec);DAYS[date]=rec;
     sheet.remove();renderAll();toast('Saved');
@@ -779,6 +805,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:8,ts:'2026-07-11T14:20:00-04:00',tag:'New',title:'Track intimacy',
+   body:'The daily check-in now has a “Sex” toggle — mark the days you’ve had sex, and optionally note whether it was protected. Any day you log shows a little pink heart on the calendar.'},
   {id:7,ts:'2026-07-11T03:11:13-04:00',tag:'New',title:'A logo for Tide',
    body:'Tide has a mark now — a cresting ocean wave curling inside a ring, washed in a soft, matte purple-pink-amber gradient. You’ll see it beside the title, on your browser tab, and as the app icon when you add Tide to your home screen.'},
   {id:6,ts:'2026-07-11T02:46:29-04:00',tag:'Improved',title:'Timestamps & tidier install',
