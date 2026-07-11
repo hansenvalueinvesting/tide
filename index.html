@@ -290,6 +290,13 @@ function periodLengths(){
   const pdays=new Set(Object.values(DAYS).filter(d=>d.period).map(d=>d.date));
   return periodStarts().map(s=>{let n=1;while(pdays.has(addDays(s,n)))n++;return n;});
 }
+// Lengths of finished periods only — the in-progress one is still growing, so it
+// would otherwise drag the average down to how many days have been logged so far.
+function completedPeriodLengths(){
+  const cur=currentPeriodStart();
+  const pdays=new Set(Object.values(DAYS).filter(d=>d.period).map(d=>d.date));
+  return periodStarts().filter(s=>s!==cur).map(s=>{let n=1;while(pdays.has(addDays(s,n)))n++;return n;});
+}
 function cycleLengths(){
   const s=periodStarts(),out=[];
   for(let i=1;i<s.length;i++)out.push(daysBetween(s[i-1],s[i]));
@@ -297,7 +304,7 @@ function cycleLengths(){
 }
 const avg=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null;
 function avgCycle(){return avg(cycleLengths())||DEFAULT_CYCLE;}
-function avgPeriod(){return avg(periodLengths())||DEFAULT_PERIOD;}
+function avgPeriod(){return avg(completedPeriodLengths())||DEFAULT_PERIOD;}
 
 // Is a period currently ongoing (today or yesterday logged as period, no explicit end)?
 function currentPeriodStart(){
@@ -388,7 +395,7 @@ function renderRing(){
 /* ================= RENDER: STATS ================= */
 function renderStats(){
   $('#stAvg').textContent=cycleLengths().length?avgCycle()+'d':'–';
-  $('#stPeriod').textContent=periodLengths().length?avgPeriod()+'d':'–';
+  $('#stPeriod').textContent=completedPeriodLengths().length?avgPeriod()+'d':'–';
   const p=predictions();
   if(p){const n=daysBetween(today(),p.nextStart);
     $('#stNext').textContent=n>0?n+'d':(n===0?'today':'now');}
@@ -420,10 +427,10 @@ function dayClasses(dateStr){
       else if(ph==='fertile')c.push('fertile');
     }
     if(dateStr===p.ovul)c.push('ovul');
-    // predicted future periods (up to 3 cycles out)
-    for(let k=0;k<=3;k++){
-      const ps=addDays(p.nextStart,k*p.cyc);
-      if(dateStr>=ps&&dateStr<addDays(ps,p.per)&&dateStr>today())c.push('predicted');
+    // projected period days: the current cycle's remaining period, plus up to 3 cycles out
+    const starts=[p.ls]; for(let k=0;k<=3;k++)starts.push(addDays(p.nextStart,k*p.cyc));
+    for(const ps of starts){
+      if(dateStr>=ps&&dateStr<addDays(ps,p.per)&&dateStr>today()&&!d?.period)c.push('predicted');
     }
   }
   if(dateStr===today())c.push('today');
