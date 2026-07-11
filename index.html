@@ -779,8 +779,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
-  {id:7,ts:'2026-07-11T02:57:39-04:00',tag:'New',title:'A logo for Tide',
-   body:'Tide has a mark now — three minimalist wave squiggles washed in a purple-to-red gradient. You’ll see it beside the title, on your browser tab, and as the app icon when you add Tide to your home screen.'},
+  {id:7,ts:'2026-07-11T03:11:13-04:00',tag:'New',title:'A logo for Tide',
+   body:'Tide has a mark now — a cresting ocean wave curling inside a ring, washed in a soft, matte purple-pink-amber gradient. You’ll see it beside the title, on your browser tab, and as the app icon when you add Tide to your home screen.'},
   {id:6,ts:'2026-07-11T02:46:29-04:00',tag:'Improved',title:'Timestamps & tidier install',
    body:'Each update now shows the exact time it went live, in Boston time. The What’s-new list scrolls on its own so the Done button always stays put, and the install guide now makes clear you can add Tide to your home screen from any browser’s share menu — not just Safari.'},
   {id:5,ts:'2026-07-11T02:39:51-04:00',tag:'New',title:'Install & What’s-new',
@@ -897,38 +897,38 @@ $('#installBtn').onclick=openInstall;
 $('#updatesBtn').onclick=openUpdates;
 
 /* ================= LOGO ================= */
-// The Tide mark: three minimalist wave squiggles washed in one purple→pink→orange→red
-// gradient. Built as SVG (crisp at any size) for the header logo and the browser-tab
-// favicon, and rasterized on a canvas for the home-screen app icons. GRAD_STOPS is the
-// single source of truth for the colour wash across all three.
-const GRAD_STOPS=[[0,'#7c3aed'],[0.34,'#e0479e'],[0.68,'#f7902b'],[1,'#e5352b']];
-// three parallel wave rows (as a fraction of the canvas) + shared shape params
-const WAVE_ROWS=[0.37,0.5,0.63], WAVE_L=0.17, WAVE_R=0.83, WAVE_AMP=0.085, WAVE_HUMPS=3, WAVE_LW=0.08;
-function wavePath(S,yc){
-  const left=S*WAVE_L,width=S*(WAVE_R-WAVE_L),amp=S*WAVE_AMP,N=44;let d='';
-  for(let k=0;k<=N;k++){const t=k/N;const px=left+t*width,py=yc+amp*Math.sin(t*Math.PI*WAVE_HUMPS);
-    d+=(k?'L':'M')+px.toFixed(2)+' '+py.toFixed(2)+' ';}
-  return d.trim();
-}
+// The Tide mark: a cresting ocean wave — a curling barrel over two flowing water lines —
+// held in a ring, washed in one muted purple→pink→amber→terracotta gradient. Drawn in a
+// 0..100 space and shared verbatim between the SVG (header mark + browser-tab favicon)
+// and the canvas (home-screen app icons), so all three renderings are identical.
+// GRAD_STOPS and WAVE_PATHS are the single source of truth.
+const GRAD_STOPS=[[0,'#8a6ea9'],[0.34,'#c67f9d'],[0.66,'#d99f61'],[1,'#c96f5c']];
+const WAVE_PATHS=[
+  'M22 62 C31 47 46 39 60 44 C71 48 75 59 66 64',                 // crest (outer)
+  'M34 64 C41 53 52 48 61 52 C70 56 71 64 64 66 C59 67 58 62 62 60', // breaking lip / barrel
+  'M27 73 C39 67 50 70 59 73 C67 75 73 72 77 67',                 // upper water line
+  'M31 82 C42 77 52 79 61 81 C68 83 73 81 76 77',                 // lower foam line
+];
+const LOGO_LW=5;   // stroke width in the 0..100 viewBox
 function logoSVG(gid){
-  const S=32;
-  const paths=WAVE_ROWS.map(fr=>`<path d="${wavePath(S,S*fr)}" fill="none" stroke="url(#${gid})" stroke-width="${(S*WAVE_LW).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
   const stops=GRAD_STOPS.map(([o,c])=>`<stop offset="${o}" stop-color="${c}"/>`).join('');
-  return `<svg viewBox="0 0 ${S} ${S}" xmlns="http://www.w3.org/2000/svg"><defs>`
-    +`<linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1">${stops}</linearGradient></defs>${paths}</svg>`;
+  const stroke=`fill="none" stroke="url(#${gid})" stroke-width="${LOGO_LW}" stroke-linecap="round" stroke-linejoin="round"`;
+  const ring=`<circle cx="50" cy="50" r="42" ${stroke}/>`;
+  const paths=WAVE_PATHS.map(d=>`<path d="${d}" ${stroke}/>`).join('');
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs>`
+    +`<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="10" y1="10" x2="90" y2="90">${stops}</linearGradient>`
+    +`</defs>${ring}${paths}</svg>`;
 }
-// Rasterized icon for install: the same waves on the app's paper tile.
+// Rasterized icon for install: the same wave on the app's paper tile.
 function drawIcon(size){
   const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');
   x.fillStyle='#f6f0ea';x.fillRect(0,0,size,size);
-  const g=x.createLinearGradient(size*0.12,size*0.12,size*0.88,size*0.88);
+  x.scale(size/100,size/100);
+  const g=x.createLinearGradient(10,10,90,90);
   GRAD_STOPS.forEach(([o,col])=>g.addColorStop(o,col));
-  x.strokeStyle=g;x.lineWidth=size*WAVE_LW;x.lineCap='round';x.lineJoin='round';
-  const left=size*WAVE_L,width=size*(WAVE_R-WAVE_L),amp=size*WAVE_AMP,N=64;
-  WAVE_ROWS.forEach(fr=>{const yc=size*fr;x.beginPath();
-    for(let k=0;k<=N;k++){const t=k/N;const px=left+t*width,py=yc+amp*Math.sin(t*Math.PI*WAVE_HUMPS);
-      k?x.lineTo(px,py):x.moveTo(px,py);}
-    x.stroke();});
+  x.strokeStyle=g;x.lineWidth=LOGO_LW;x.lineCap='round';x.lineJoin='round';
+  x.beginPath();x.arc(50,50,42,0,Math.PI*2);x.stroke();
+  WAVE_PATHS.forEach(d=>x.stroke(new Path2D(d)));
   return c.toDataURL('image/png');
 }
 
