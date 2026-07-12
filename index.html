@@ -347,8 +347,8 @@ nav button svg{width:22px;height:22px}
     Today
   </button>
   <button data-view="history">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg>
-    History
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>
+    Your Body
   </button>
   <button data-view="settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
@@ -959,6 +959,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:14,ts:'2026-07-12T16:45:00-04:00',tag:'Improved',title:'“History” is now “Your Body”',
+   body:'The History tab is now called Your Body — a friendlier home for your insights, predictions and cycle history, all about you.'},
   {id:13,ts:'2026-07-12T16:20:00-04:00',tag:'New',title:'Insights on your history',
    body:'The History tab opens with a new Insights section: what’s coming next (your next period and fertile window), a plain-language read on how regular your cycles are, your headline averages, and a colour-coded look at what a typical cycle is for you — all above your cycle history.'},
   {id:12,ts:'2026-07-12T16:15:00-04:00',tag:'Fix',title:'Install Tide on your computer',
