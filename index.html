@@ -460,6 +460,19 @@ function phaseName(){
   const ph=dayPhase(today());
   return ph?PHASE_LABEL[ph]:'Getting started';
 }
+// How many days into the current phase a date is (1-based), so "Day 2 of Follicular"
+// counts from the phase's own start rather than from the start of the cycle.
+function phaseDay(dateStr){
+  const ph=dayPhase(dateStr); if(!ph)return null;
+  const p=predictions(); if(!p)return null;
+  let start;
+  if(ph==='menstruation')start=p.ls;                 // period counts from the cycle start
+  else if(ph==='follicular')start=addDays(p.ls,p.per); // first day after the period
+  else if(ph==='fertile')start=p.fertileStart;
+  else if(ph==='ovulation')start=p.ovul;             // a single day
+  else start=addDays(p.ovul,1);                       // luteal starts just after ovulation
+  return daysBetween(start,dateStr)+1;
+}
 
 /* ================= RENDER: RING ================= */
 function renderRing(){
@@ -510,11 +523,12 @@ function renderHeader(){
   const cd=cycleDay(), p=predictions();
   const title=$('#hTitle'), sub=$('#hSub');
   if(!cd||!p){title.textContent='Tide';sub.textContent='Log a period to begin';return;}
-  title.textContent=`Day ${cd} of ${phaseName()}`;
+  title.textContent=`Day ${phaseDay(today())} of ${phaseName()}`;
   if(currentPeriodStart()){sub.textContent='';return;}   // in period → drop next-period line
   const n=daysBetween(today(),p.nextStart);
-  sub.textContent=n>0?`Next period in ${n} day${n===1?'':'s'}`
+  const nextPhrase=n>0?`Next period in ${n} day${n===1?'':'s'}`
     :n===0?'Next period expected today':'Period may be late';
+  sub.textContent=`Day ${cd} of this cycle, ${nextPhrase}`;
 }
 
 /* ================= RENDER: CALENDAR ================= */
