@@ -29,6 +29,10 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
+/* The document element is what iOS actually scrolls, so the overscroll guard and the
+   paper background belong here too — otherwise a bounce past the bottom reveals a blank
+   (white) strip below the app. */
+html{background:var(--paper);overscroll-behavior-y:none}
 body{
   font-family:'Inter',system-ui,sans-serif;background:var(--paper);color:var(--ink);
   -webkit-font-smoothing:antialiased;line-height:1.5;
@@ -41,7 +45,9 @@ input,select,textarea{font-family:inherit;font-size:16px}
 .hidden{display:none!important}
 
 /* ---------- APP SHELL ---------- */
-#app{max-width:480px;margin:0 auto;padding:0 18px 120px}
+/* Bottom padding only needs to clear the fixed nav (~65px) plus a small gap and the
+   home-indicator safe area — a flat 120px left a dead blank band you could scroll into. */
+#app{max-width:480px;margin:0 auto;padding:0 18px calc(80px + env(safe-area-inset-bottom))}
 header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:22px 0 12px}
 header h1{font-size:26px;letter-spacing:-.5px;line-height:1.15}
 .hsub{margin-top:4px;font-size:14px;color:var(--ink-soft)}
@@ -959,6 +965,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:16,ts:'2026-07-12T17:35:00-04:00',tag:'Fix',title:'No more blank space at the bottom',
+   body:'Scrolling to the bottom of a page no longer runs past the content into an empty gap. The page now stops right at the nav bar, and an overscroll bounce stays on Tide’s paper background instead of flashing blank.'},
   {id:15,ts:'2026-07-12T17:05:00-04:00',tag:'Improved',title:'One consistent Tide icon',
    body:'The header logo and the home-screen app icon now match the browser-tab icon — the cresting wave in bold off-white on a rounded gradient tile. One clean mark everywhere you see Tide.'},
   {id:14,ts:'2026-07-12T16:45:00-04:00',tag:'Improved',title:'“History” is now “Your Body”',
