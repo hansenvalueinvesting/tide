@@ -959,6 +959,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:15,ts:'2026-07-12T17:05:00-04:00',tag:'Improved',title:'One consistent Tide icon',
+   body:'The header logo and the home-screen app icon now match the browser-tab icon — the cresting wave in bold off-white on a rounded gradient tile. One clean mark everywhere you see Tide.'},
   {id:14,ts:'2026-07-12T16:45:00-04:00',tag:'Improved',title:'“History” is now “Your Body”',
    body:'The History tab is now called Your Body — a friendlier home for your insights, predictions and cycle history, all about you.'},
   {id:13,ts:'2026-07-12T16:20:00-04:00',tag:'New',title:'Insights on your history',
@@ -1092,36 +1094,19 @@ $('#updatesBtn').onclick=openUpdates;
 
 /* ================= LOGO ================= */
 // The Tide mark: a cresting ocean wave — a curling barrel over two flowing water lines —
-// held in a ring, washed in one muted purple→pink→amber→terracotta gradient. Drawn in a
-// 0..100 space and shared verbatim between the SVG (header mark + browser-tab favicon)
-// and the canvas (home-screen app icons), so all three renderings are identical.
-// GRAD_STOPS and WAVE_PATHS are the single source of truth.
+// picked out in bold off-white strokes on a rounded tile washed in one muted
+// purple→pink→amber→terracotta gradient. Drawn in a 0..100 space and shared verbatim
+// across the header mark, the browser-tab favicon (SVG) and the home-screen app icons
+// (canvas), so every rendering is identical. GRAD_STOPS and FAV_WAVES are the single
+// source of truth.
 const GRAD_STOPS=[[0,'#8a6ea9'],[0.34,'#c67f9d'],[0.66,'#d99f61'],[1,'#c96f5c']];
-const WAVE_PATHS=[
-  'M22 62 C31 47 46 39 60 44 C71 48 75 59 66 64',                 // crest (outer)
-  'M34 64 C41 53 52 48 61 52 C70 56 71 64 64 66 C59 67 58 62 62 60', // breaking lip / barrel
-  'M27 73 C39 67 50 70 59 73 C67 75 73 72 77 67',                 // upper water line
-  'M31 82 C42 77 52 79 61 81 C68 83 73 81 76 77',                 // lower foam line
-];
-const LOGO_LW=5;   // stroke width in the 0..100 viewBox
-function logoSVG(gid){
-  const stops=GRAD_STOPS.map(([o,c])=>`<stop offset="${o}" stop-color="${c}"/>`).join('');
-  const stroke=`fill="none" stroke="url(#${gid})" stroke-width="${LOGO_LW}" stroke-linecap="round" stroke-linejoin="round"`;
-  const ring=`<circle cx="50" cy="50" r="42" ${stroke}/>`;
-  const paths=WAVE_PATHS.map(d=>`<path d="${d}" ${stroke}/>`).join('');
-  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs>`
-    +`<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="10" y1="10" x2="90" y2="90">${stops}</linearGradient>`
-    +`</defs>${ring}${paths}</svg>`;
-}
-// A browser tab renders the favicon at ~16px, where the detailed thin-stroke ring above
-// collapses into an illegible smudge. So the tab icon gets its own bolder variant: the
-// gradient poured into a rounded tile with a few thick white wave strokes — high contrast
-// on both light and dark tab strips, and still clearly a cresting wave when tiny.
 const FAV_WAVES=[
   'M22 46 C34 31 52 31 64 44 C71 51 67 61 58 59',   // crest curl
   'M22 64 C39 55 55 60 68 64 C76 67 82 64 84 60',   // water line
   'M28 80 C42 73 56 76 68 79',                       // foam line
 ];
+// SVG tile → header mark + browser-tab favicon. Rounded corners are drawn in; a tab
+// renders it at ~16px, where the bold white waves on the gradient stay legible.
 function faviconSVG(gid){
   const stops=GRAD_STOPS.map(([o,c])=>`<stop offset="${o}" stop-color="${c}"/>`).join('');
   const waves=FAV_WAVES.map(d=>`<path d="${d}"/>`).join('');
@@ -1130,24 +1115,25 @@ function faviconSVG(gid){
     +`<rect x="2" y="2" width="96" height="96" rx="26" fill="url(#${gid})"/>`
     +`<g fill="none" stroke="#fdf6ee" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">${waves}</g></svg>`;
 }
-// Rasterized icon for install: the same wave on the app's paper tile.
+// Canvas tile → apple-touch-icon + web-manifest icons. The same design at full size: the
+// gradient poured edge-to-edge (the OS rounds it into the home-screen tile) with the same
+// bold white wave strokes, so the app icon matches the favicon and header mark.
 function drawIcon(size){
   const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');
-  x.fillStyle='#f6f0ea';x.fillRect(0,0,size,size);
   x.scale(size/100,size/100);
-  const g=x.createLinearGradient(10,10,90,90);
+  const g=x.createLinearGradient(6,6,94,94);
   GRAD_STOPS.forEach(([o,col])=>g.addColorStop(o,col));
-  x.strokeStyle=g;x.lineWidth=LOGO_LW;x.lineCap='round';x.lineJoin='round';
-  x.beginPath();x.arc(50,50,42,0,Math.PI*2);x.stroke();
-  WAVE_PATHS.forEach(d=>x.stroke(new Path2D(d)));
+  x.fillStyle=g;x.fillRect(0,0,100,100);
+  x.strokeStyle='#fdf6ee';x.lineWidth=8;x.lineCap='round';x.lineJoin='round';
+  FAV_WAVES.forEach(d=>x.stroke(new Path2D(d)));
   return c.toDataURL('image/png');
 }
 
 /* ================= PWA: logo, icon + manifest ================= */
 function setupPWA(){
-  // SVG logo → header mark + browser-tab favicon (no canvas needed)
+  // SVG tile → header mark + browser-tab favicon (no canvas needed), same design
   try{
-    $('#logoMark').innerHTML=logoSVG('tideGrad');
+    $('#logoMark').innerHTML=faviconSVG('tideGrad');
     $('#favicon').href='data:image/svg+xml,'+encodeURIComponent(faviconSVG('tideGradFav'));
   }catch(e){}
   // Rasterized icons → apple-touch-icon + web manifest for add-to-home-screen
