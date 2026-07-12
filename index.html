@@ -128,6 +128,19 @@ header h1{font-size:26px;letter-spacing:-.5px;line-height:1.15}
 .phase-row .pdays{color:var(--ink-soft);font-size:12.5px;white-space:nowrap}
 .hist-proj{font-size:12px;color:var(--ink-soft);margin:12px 0 0;line-height:1.5}
 
+/* ---------- INSIGHTS ---------- */
+.insight-card{background:var(--paper-2);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.insight-card .ic-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px}
+.insight-card h3{font-size:19px;line-height:1.25;color:var(--plum-deep);margin-bottom:6px}
+.insight-card p{margin:0;font-size:13.5px;color:var(--ink-soft);line-height:1.55}
+.insight-card .phase-bar{margin-top:2px}
+#insights .stats{margin:0 0 12px}
+.insight-empty{font-size:13.5px;color:var(--ink-soft);line-height:1.6;background:var(--paper-2);border-radius:var(--r);padding:18px}
+.ic-next{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:2px}
+.ic-next .icn-date{font-family:'Fraunces',serif;font-size:16px;color:var(--ink);font-weight:500}
+.ic-next .icn-away{font-size:13px;color:var(--plum);font-weight:600;white-space:nowrap}
+.ic-next+.ic-next{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+
 /* ---------- BOTTOM NAV ---------- */
 nav{position:fixed;bottom:0;left:0;right:0;background:rgba(246,240,234,.9);backdrop-filter:blur(12px);
   border-top:1px solid var(--line);display:flex;justify-content:space-around;
@@ -294,14 +307,10 @@ nav button svg{width:22px;height:22px}
 
   <!-- HISTORY -->
   <section id="view-history" class="hidden">
+    <div class="sec-title">Insights</div>
+    <div id="insights"></div>
     <div class="sec-title">Cycle history</div>
     <div id="histList"></div>
-    <div class="sec-title">Averages over time</div>
-    <div class="stats">
-      <div class="stat"><b id="hAvg">–</b><small>avg cycle</small></div>
-      <div class="stat"><b id="hVar">–</b><small>variation</small></div>
-      <div class="stat"><b id="hCount">–</b><small>cycles logged</small></div>
-    </div>
     <div id="histEmpty" class="privacy-note hidden">No completed cycles yet. Log a period start and its next start to see history here.</div>
   </section>
 
@@ -665,9 +674,62 @@ function renderHistory(){
     list.innerHTML+=`<div class="hist-card">${head}${body}</div>`;
   }
   $$('#histList .hist-head').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('open'));
-  $('#hAvg').textContent=lens.length?avg(lens)+'d':'–';
-  $('#hVar').textContent=lens.length>1?'±'+Math.round((Math.max(...lens)-Math.min(...lens))/2)+'d':'–';
-  $('#hCount').textContent=lens.length;
+  renderInsights();
+}
+
+/* ================= RENDER: INSIGHTS ================= */
+// A holistic, plain-language read of the whole logged history: what's coming next,
+// how regular the cycles are, the headline averages, and what a typical cycle looks
+// like phase-by-phase. Everything degrades gracefully as more data is logged.
+function renderInsights(){
+  const el=$('#insights'); if(!el)return;
+  const starts=periodStarts(), lens=cycleLengths(), plens=completedPeriodLengths();
+  if(!starts.length){
+    el.innerHTML=`<div class="insight-empty">Log your first period and your insights appear here — your typical cycle length, how regular your cycles are, when your next period and fertile window are due, and what a normal cycle looks like for you.</div>`;
+    return;
+  }
+  let html='';
+
+  // 1) What's coming — next period & fertile window (from the same predictions the ring uses)
+  const p=predictions();
+  if(p){
+    const nDays=daysBetween(today(),p.nextStart);
+    const away=nDays>0?`in ${nDays} day${nDays===1?'':'s'}`:nDays===0?'today':`${-nDays} day${nDays===-1?'':'s'} late`;
+    let rows=`<div class="ic-next"><span class="icn-date">${fmtShort(p.nextStart)}</span><span class="icn-away">Period ${away}</span></div>`;
+    if(p.fertileEnd>=today()){
+      const fLabel=p.fertileStart>today()?`from ${fmtShort(p.fertileStart)}`:'open now';
+      rows+=`<div class="ic-next"><span class="icn-date">${fmtShort(p.fertileStart)} – ${fmtShort(p.fertileEnd)}</span><span class="icn-away">Fertile ${fLabel}</span></div>`;
+    }
+    html+=`<div class="insight-card"><div class="ic-label">What's coming</div>${rows}</div>`;
+  }
+
+  // 2) Regularity — a friendly, one-line verdict on how consistent the cycles are
+  if(lens.length>=2){
+    const lo=Math.min(...lens), hi=Math.max(...lens), spread=hi-lo, pm=Math.round(spread/2);
+    const head=spread<=2?'Your cycles are very regular'
+      :spread<=5?'Your cycles are fairly regular'
+      :spread<=9?'Your cycles are a little irregular'
+      :'Your cycles vary quite a bit';
+    const note=`Across ${lens.length} cycle${lens.length===1?'':'s'} they've run ${lo}–${hi} days — about ±${pm} day${pm===1?'':'s'} around your ${avgCycle()}-day average.`;
+    html+=`<div class="insight-card"><div class="ic-label">Cycle regularity</div><h3>${head}</h3><p>${note}</p></div>`;
+  }else{
+    html+=`<div class="insight-card"><div class="ic-label">Cycle regularity</div><h3>One cycle logged so far</h3><p>Log your next period start and Tide can show how regular your cycles are and how they change over time.</p></div>`;
+  }
+
+  // 3) Headline averages
+  html+=`<div class="stats">
+    <div class="stat"><b>${lens.length?avgCycle()+'d':'–'}</b><small>avg cycle</small></div>
+    <div class="stat"><b>${plens.length?avgPeriod()+'d':'–'}</b><small>avg period</small></div>
+    <div class="stat"><b>${lens.length}</b><small>cycles logged</small></div>
+  </div>`;
+
+  // 4) A typical cycle — same colour-coded phase breakdown as the cards below
+  if(lens.length>=1){
+    const cyc=avgCycle(), per=avgPeriod();
+    html+=`<div class="insight-card"><div class="ic-label">A typical cycle for you</div>${phaseBar(cyc,per)}${phaseRows(cyc,per)}</div>`;
+  }
+
+  el.innerHTML=html;
 }
 
 function renderAll(){renderHeader();renderRing();renderStats();renderCalendar();renderHistory();}
@@ -897,6 +959,10 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:13,ts:'2026-07-12T16:20:00-04:00',tag:'New',title:'Insights on your history',
+   body:'The History tab opens with a new Insights section: what’s coming next (your next period and fertile window), a plain-language read on how regular your cycles are, your headline averages, and a colour-coded look at what a typical cycle is for you — all above your cycle history.'},
+  {id:12,ts:'2026-07-12T16:15:00-04:00',tag:'Fix',title:'Install Tide on your computer',
+   body:'Tide can now be installed as an app on desktop Chrome and Edge — look for the install icon in the address bar, or use the Install button here. Tide also works fully offline now, on every device.'},
   {id:11,ts:'2026-07-12T13:30:00-04:00',tag:'New',title:'Tap a cycle to see its phases',
    body:'Each cycle in your history is now a card you can open. Tap one to reveal a colour-coded breakdown of that cycle — menstruation, follicular, fertile window, ovulation and luteal — using the same colours as the home screen, with the day range and length of every phase.'},
   {id:10,ts:'2026-07-11T17:10:00-04:00',tag:'Fix',title:'A clearer browser-tab icon',
@@ -1094,6 +1160,13 @@ function setupPWA(){
     const blob=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
     $('#manifest').href=URL.createObjectURL(blob);
   }catch(e){/* canvas/manifest unsupported — the install guide still works */}
+  // Service worker → the piece desktop Chrome/Edge require before they'll offer to
+  // install Tide as an app (and it makes Tide work offline). Only over http(s); opening
+  // the file directly (file://) can't register one, so we skip it there without erroring.
+  try{
+    if('serviceWorker' in navigator && location.protocol.startsWith('http'))
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }catch(e){}
 }
 
 /* ================= NAV ================= */
