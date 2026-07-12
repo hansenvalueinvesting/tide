@@ -29,15 +29,20 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
-/* The document element is what iOS actually scrolls, so the overscroll guard and the
-   paper background belong here too — otherwise a bounce past the bottom reveals a blank
-   (white) strip below the app. */
+/* Paper background on <html> too so any overscroll never flashes a blank white strip. */
 html{background:var(--paper);overscroll-behavior-y:none}
 body{
   font-family:'Inter',system-ui,sans-serif;background:var(--paper);color:var(--ink);
   -webkit-font-smoothing:antialiased;line-height:1.5;
   padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
   overscroll-behavior-y:none;
+  /* Fixed-height app shell: the shell fills the (dynamic) viewport, the content area
+     scrolls inside it, and the nav sits at the bottom as a normal flex child. This avoids
+     a page-level scroll under a position:fixed nav — the setup that let iOS leave the nav
+     floating mid-screen with a blank gap below it. 100dvh tracks the browser's collapsing
+     toolbars; 100vh is the fallback for older engines. */
+  display:flex;flex-direction:column;
+  height:100vh;height:100dvh;overflow:hidden;
 }
 h1,h2,h3{font-family:'Fraunces',serif;font-weight:500;margin:0}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
@@ -45,9 +50,10 @@ input,select,textarea{font-family:inherit;font-size:16px}
 .hidden{display:none!important}
 
 /* ---------- APP SHELL ---------- */
-/* Bottom padding only needs to clear the fixed nav (~65px) plus a small gap and the
-   home-indicator safe area — a flat 120px left a dead blank band you could scroll into. */
-#app{max-width:480px;margin:0 auto;padding:0 18px calc(80px + env(safe-area-inset-bottom))}
+/* The only scroll container. min-height:0 lets it shrink within the flex column so its own
+   overflow scrolls, instead of growing the page and pushing content past the nav. */
+#app{width:100%;max-width:480px;margin-inline:auto;padding:0 18px 16px;
+  flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain}
 header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:22px 0 12px}
 header h1{font-size:26px;letter-spacing:-.5px;line-height:1.15}
 .hsub{margin-top:4px;font-size:14px;color:var(--ink-soft)}
@@ -148,9 +154,11 @@ header h1{font-size:26px;letter-spacing:-.5px;line-height:1.15}
 .ic-next+.ic-next{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 
 /* ---------- BOTTOM NAV ---------- */
-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(246,240,234,.9);backdrop-filter:blur(12px);
+/* A normal flex child pinned at the bottom of the shell — not position:fixed, so it can't
+   detach from the viewport bottom on iOS. */
+nav{flex:0 0 auto;background:rgba(246,240,234,.9);backdrop-filter:blur(12px);
   border-top:1px solid var(--line);display:flex;justify-content:space-around;
-  padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:20}
+  padding:8px 0 calc(8px + env(safe-area-inset-bottom))}
 nav button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--ink-soft);padding:6px 14px;border-radius:12px}
 nav button.on{color:var(--plum)}
 nav button svg{width:22px;height:22px}
@@ -965,6 +973,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:17,ts:'2026-07-12T18:05:00-04:00',tag:'Fix',title:'Nav bar always sits at the bottom',
+   body:'On some phones the bottom tab bar could float up into the middle of the screen with a big blank area beneath it. The layout now fills the screen exactly, with only the content scrolling, so Today · Your Body · Settings always stays put at the bottom.'},
   {id:16,ts:'2026-07-12T17:35:00-04:00',tag:'Fix',title:'No more blank space at the bottom',
    body:'Scrolling to the bottom of a page no longer runs past the content into an empty gap. The page now stops right at the nav bar, and an overscroll bounce stays on Tide’s paper background instead of flashing blank.'},
   {id:15,ts:'2026-07-12T17:05:00-04:00',tag:'Improved',title:'One consistent Tide icon',
