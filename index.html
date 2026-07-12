@@ -106,9 +106,27 @@ header h1{font-size:26px;letter-spacing:-.5px;line-height:1.15}
 .cell:active{transform:scale(.9)}
 
 /* ---------- HISTORY ---------- */
-.hist-item{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;
-  background:var(--paper-2);border-radius:12px;margin-bottom:8px;font-size:14px}
-.hist-item .len{color:var(--ink-soft);font-size:13px}
+.hist-card{background:var(--paper-2);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.hist-head{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;
+  padding:12px 14px;background:none;text-align:left;font-size:14px;color:var(--ink);transition:.12s}
+.hist-head:active{background:var(--rose-soft)}
+.hist-head .hh-main b{font-weight:600}
+.hist-head .len{color:var(--ink-soft);font-size:13px}
+.hist-head .hh-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.hist-chev{width:16px;height:16px;color:var(--ink-soft);transition:transform .2s}
+.hist-card.open .hist-chev{transform:rotate(180deg)}
+.hist-body{display:none;padding:0 14px 14px;animation:fade .18s ease}
+.hist-card.open .hist-body{display:block}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.phase-bar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:2px 0 14px;
+  box-shadow:inset 0 0 0 1px rgba(90,58,77,.04)}
+.phase-bar .pseg{height:100%;min-width:2px}
+.phase-list{display:flex;flex-direction:column;gap:9px}
+.phase-row{display:flex;align-items:center;gap:10px;font-size:13px}
+.phase-row .pdot{width:12px;height:12px;border-radius:4px;flex:0 0 auto}
+.phase-row .pname{flex:1 1 auto;color:var(--ink)}
+.phase-row .pdays{color:var(--ink-soft);font-size:12.5px;white-space:nowrap}
+.hist-proj{font-size:12px;color:var(--ink-soft);margin:12px 0 0;line-height:1.5}
 
 /* ---------- BOTTOM NAV ---------- */
 nav{position:fixed;bottom:0;left:0;right:0;background:rgba(246,240,234,.9);backdrop-filter:blur(12px);
@@ -585,6 +603,47 @@ function renderCalendar(){
 }
 
 /* ================= RENDER: HISTORY ================= */
+// Colours for each phase, mirroring the home-screen legend and ring exactly.
+const PHASE_COLORS={menstruation:'var(--rose)',follicular:'var(--follic-soft)',
+  fertile:'var(--fertile-soft)',ovulation:'var(--ovul)',luteal:'var(--luteal-soft)'};
+// Which phase a given cycle-day (1-based) falls in, for a cycle of length `cyc` with a
+// `per`-day period. Same ordering as dayPhase(), so a history card colours identically to
+// the ring and calendar: the fertile window straddles ovulation, luteal follows it.
+function histDayPhase(day,cyc,per){
+  const ovul=Math.min(Math.max(per+1,cyc-LUTEAL),cyc);
+  const fS=Math.max(per+1,ovul-FERTILE_PRE), fE=Math.min(cyc,ovul+FERTILE_POST);
+  if(day<=per)return 'menstruation';
+  if(day>=fS&&day<=fE)return day===ovul?'ovulation':'fertile';
+  if(day>ovul)return 'luteal';
+  return 'follicular';
+}
+// A proportional, colour-coded bar of the whole cycle: contiguous same-phase days merged
+// into one segment each (so it reads like the ring unrolled into a straight line).
+function phaseBar(cyc,per){
+  const segs=[]; let cur=null;
+  for(let d=1;d<=cyc;d++){const ph=histDayPhase(d,cyc,per);
+    if(cur&&cur.ph===ph)cur.n++; else{cur={ph,n:1};segs.push(cur);}}
+  return `<div class="phase-bar">`+segs.map(s=>
+    `<div class="pseg" style="flex:${s.n};background:${PHASE_COLORS[s.ph]}"></div>`).join('')+`</div>`;
+}
+// The per-phase breakdown list, in cycle order, matching the home-screen legend.
+function phaseRows(cyc,per){
+  per=Math.min(per,cyc);
+  const ovul=Math.min(Math.max(per+1,cyc-LUTEAL),cyc);
+  const fS=Math.max(per+1,ovul-FERTILE_PRE), fE=Math.min(cyc,ovul+FERTILE_POST);
+  const rows=[];
+  const span=(a,b)=>b>a?`Days ${a}–${b} · ${b-a+1} days`:`Day ${a} · 1 day`;
+  const add=(ph,name,a,b)=>{if(b>=a)rows.push({ph,name,label:span(a,b)});};
+  add('menstruation','Menstruation',1,per);
+  add('follicular','Follicular',per+1,fS-1);
+  add('fertile','Fertile window',fS,fE);
+  rows.push({ph:'ovulation',name:'Ovulation',label:`Day ${ovul}`});
+  add('luteal','Luteal',fE+1,cyc);
+  return `<div class="phase-list">`+rows.map(r=>
+    `<div class="phase-row"><span class="pdot" style="background:${PHASE_COLORS[r.ph]}"></span>`
+    +`<span class="pname">${r.name}</span><span class="pdays">${r.label}</span></div>`).join('')+`</div>`;
+}
+const chevSVG=`<svg class="hist-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
 function renderHistory(){
   const s=periodStarts(),lens=cycleLengths(),plens=periodLengths();
   const list=$('#histList'); list.innerHTML='';
@@ -592,12 +651,20 @@ function renderHistory(){
   else{$('#histEmpty').classList.add('hidden');}
   for(let i=s.length-1;i>=0;i--){
     const start=s[i];
-    const cyc=i<s.length-1?daysBetween(start,s[i+1]):null;
+    const cyc=i<s.length-1?daysBetween(start,s[i+1]):null;   // null ⇒ current, in-progress cycle
     const per=plens[i];
-    list.innerHTML+=`<div class="hist-item">
-      <div><b>${fmtShort(start)}</b>${cyc?` → ${fmtShort(s[i+1])}`:' <span class="len">(current)</span>'}</div>
-      <div class="len">${per}d period${cyc?` · ${cyc}d cycle`:''}</div></div>`;
+    // Completed cycles use their real length; the current one is projected from your averages.
+    const barCyc=cyc||avgCycle(), barPer=Math.min(cyc?per:avgPeriod(),barCyc);
+    const head=`<button class="hist-head">
+      <span class="hh-main"><b>${fmtShort(start)}</b>${cyc?` → ${fmtShort(s[i+1])}`:' <span class="len">(current)</span>'}</span>
+      <span class="hh-right"><span class="len">${per}d period${cyc?` · ${cyc}d cycle`:''}</span>${chevSVG}</span>
+    </button>`;
+    const body=`<div class="hist-body">${phaseBar(barCyc,barPer)}${phaseRows(barCyc,barPer)}`
+      +(cyc?'':`<p class="hist-proj">Projected from your ${avgCycle()}-day average cycle — this cycle is still in progress.</p>`)
+      +`</div>`;
+    list.innerHTML+=`<div class="hist-card">${head}${body}</div>`;
   }
+  $$('#histList .hist-head').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('open'));
   $('#hAvg').textContent=lens.length?avg(lens)+'d':'–';
   $('#hVar').textContent=lens.length>1?'±'+Math.round((Math.max(...lens)-Math.min(...lens))/2)+'d':'–';
   $('#hCount').textContent=lens.length;
@@ -830,6 +897,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:11,ts:'2026-07-12T13:30:00-04:00',tag:'New',title:'Tap a cycle to see its phases',
+   body:'Each cycle in your history is now a card you can open. Tap one to reveal a colour-coded breakdown of that cycle — menstruation, follicular, fertile window, ovulation and luteal — using the same colours as the home screen, with the day range and length of every phase.'},
   {id:10,ts:'2026-07-11T17:10:00-04:00',tag:'Fix',title:'A clearer browser-tab icon',
    body:'The Tide wave now shows up crisply on your browser tab. The old mark was too fine to read at that tiny size, so the tab version is now a bolder wave on a rounded gradient tile — the same look you already see when you add Tide to your home screen.'},
   {id:9,ts:'2026-07-11T16:05:00-04:00',tag:'Improved',title:'Period ends detected automatically',
