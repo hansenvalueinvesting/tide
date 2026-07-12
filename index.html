@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#2a1f2a">
+<meta name="theme-color" content="#f6f0ea">
 <title>Tide</title>
 <!-- PWA / add-to-home-screen -->
 <link id="favicon" rel="icon" type="image/svg+xml">
@@ -1005,7 +1005,7 @@ function setupPWA(){
     const base=location.pathname.replace(/[^/]*$/,'');
     const manifest={name:'Tide',short_name:'Tide',description:'Private, on-device period & cycle tracker',
       start_url:location.pathname+location.search||'.',scope:base||'/',
-      display:'standalone',orientation:'portrait',background_color:'#f6f0ea',theme_color:'#2a1f2a',
+      display:'standalone',orientation:'portrait',background_color:'#f6f0ea',theme_color:'#f6f0ea',
       icons:[{src:drawIcon(192),sizes:'192x192',type:'image/png',purpose:'any maskable'},
              {src:drawIcon(512),sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
     const blob=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
