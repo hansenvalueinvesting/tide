@@ -92,6 +92,22 @@ header h1{font-size:26px;letter-spacing:-.5px;line-height:1.15}
 .stat b{font-family:'Fraunces',serif;font-size:24px;font-weight:500;display:block;color:var(--plum-deep)}
 .stat small{font-size:11px;color:var(--ink-soft);letter-spacing:.03em}
 
+/* ---------- TODAY: BODY OVERVIEW ---------- */
+/* Two cards under the ring, reusing the insight-card shell: where each hormone stands
+   right now, and what you're likely to feel — personalised from your own logs when there
+   are enough, a general phase read otherwise. */
+#todayBody{margin:4px 0 4px}
+#todayBody .insight-card:last-child{margin-bottom:8px}
+.horm{display:flex;flex-direction:column;gap:13px}
+.horm-row{display:flex;align-items:center;gap:11px}
+.horm-name{width:96px;flex:0 0 auto;font-size:13.5px;color:var(--ink)}
+.horm-meter{flex:1 1 auto;height:8px;border-radius:6px;background:var(--paper);overflow:hidden}
+.horm-fill{display:block;height:100%;border-radius:6px;transition:width .3s}
+.horm-state{width:96px;flex:0 0 auto;text-align:right;font-size:12px;color:var(--ink-soft)}
+.sym-caption{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin:13px 0 9px}
+.sym-tags{display:flex;flex-wrap:wrap;gap:8px}
+.sym-tag{padding:7px 13px;border-radius:20px;background:var(--paper);font-size:13px;color:var(--ink)}
+
 /* ---------- SECTION ---------- */
 .sec-title{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin:24px 4px 12px}
 
@@ -301,11 +317,7 @@ nav button svg{width:22px;height:22px}
 
     <button class="cta" id="checkinBtn">Daily check-in</button>
 
-    <div class="stats">
-      <div class="stat"><b id="stFertile">–</b><small>fertile</small></div>
-      <div class="stat"><b id="stOvul">–</b><small>ovulation</small></div>
-      <div class="stat"><b id="stNext">–</b><small>next period</small></div>
-    </div>
+    <div id="todayBody"></div>
 
     <div class="sec-title">This month</div>
     <div class="cal">
@@ -549,25 +561,110 @@ function renderRing(){
   $('#ringPhase').textContent=phaseName();
 }
 
-/* ================= RENDER: STATS ================= */
-// The Today strip is about the *current* cycle, not long-run averages (those live in
-// Your Body → Insights). Three forward-looking states, all read straight from predictions():
-// where the fertile window stands, when ovulation is, and when the next period is due.
-function renderStats(){
-  const p=predictions(); const t=today();
-  if(!p){$('#stFertile').textContent='–';$('#stOvul').textContent='–';$('#stNext').textContent='–';return;}
-  // Countdowns read "in Nd" so it's clear the number is days *until* the event, not days
-  // into it; the plain state words (open/today/…) are already unambiguous on their own.
-  // Fertile window: counting down to it, open right now, or already behind us this cycle.
-  if(t<p.fertileStart){const n=daysBetween(t,p.fertileStart);$('#stFertile').textContent='in '+n+'d';}
-  else if(t<=p.fertileEnd)$('#stFertile').textContent='open';
-  else $('#stFertile').textContent='closed';
-  // Ovulation: days until, the day itself, or passed.
-  const o=daysBetween(t,p.ovul);
-  $('#stOvul').textContent=o>0?'in '+o+'d':(o===0?'today':'passed');
-  // Next period: days until, due today, or overdue.
-  const n=daysBetween(t,p.nextStart);
-  $('#stNext').textContent=n>0?'in '+n+'d':(n===0?'today':'late');
+/* ================= RENDER: TODAY BODY OVERVIEW ================= */
+// The Today panel is about your body *right now*, not what's coming (those countdowns live
+// in Your Body → Insights). Two reads: where each hormone stands today, and what you're
+// likely to feel — drawn from your own history when there's enough of it, a general phase
+// read otherwise. Where-in-the-cycle is already covered by the ring and header, so we don't
+// restate it here.
+
+// Colours mirror the "See the science" hormone legend exactly.
+const HORM_COLORS={Estrogen:'var(--plum)',Progesterone:'var(--luteal)',LH:'var(--ovul)',FSH:'var(--follic)'};
+
+// The same idealized hormone curves the science view draws (see scienceSVG), sampled at a
+// single cycle day so Today can describe each hormone's level (0..1) and which way it's
+// heading. Scaled to this person's cycle via cycleModel().
+function hormoneLevels(cd){
+  const {cyc,ov,lut}=cycleModel();
+  const clamp=(v,a,b)=>Math.min(Math.max(v,a),b);
+  const G=(x,mu,sig)=>Math.exp(-((x-mu)*(x-mu))/(2*sig*sig));
+  const fw=Math.max(cyc*0.10,2), lw=Math.max(lut*0.5,2);
+  const fns={
+    Estrogen:d=>clamp(0.10+0.85*G(d,ov-1,fw)+0.42*G(d,ov+lut*0.5,lw),0,1),
+    Progesterone:d=>clamp(0.06+clamp((d-(ov-1))/2,0,1)*0.88*G(d,ov+lut*0.45,Math.max(lut*0.45,2)),0,1),
+    LH:d=>clamp(0.10+0.92*G(d,ov,1.1),0,1),
+    FSH:d=>clamp(0.14+0.26*G(d,2,4)+0.32*G(d,ov,1.5),0,1),
+  };
+  const dd=clamp(cd,1,cyc);
+  return Object.entries(fns).map(([name,fn])=>{
+    const lvl=fn(dd), prev=fn(clamp(dd-1,1,cyc)), next=fn(clamp(dd+1,1,cyc));
+    const slope=next-prev;
+    const peak=lvl>=prev&&lvl>=next&&lvl>0.6;
+    const mag=lvl>0.66?'High':lvl>0.33?'Moderate':'Low';
+    const trend=peak?'peaking':slope>0.05?'rising':slope<-0.05?'falling':'steady';
+    return {name,lvl,mag,trend};
+  });
+}
+
+// The general, biology-driven read of each phase: a plain-language "how you may feel" line
+// plus the symptoms most commonly reported then (drawn from the app's own symptom list, so
+// they render as familiar chips). Used as-is when there isn't enough personal history.
+const PHASE_BODY={
+  menstruation:{feel:"Estrogen and progesterone are at their lowest as your lining sheds. Energy and motivation often sit low — rest, warmth and iron-rich food tend to help.",
+    symptoms:['Cramps','Fatigue','Backache','Headache','Bloating']},
+  follicular:{feel:"Estrogen is climbing as a new egg matures. Energy, mood and focus usually rise with it — often the easiest stretch to take on harder things.",
+    symptoms:['Headache','Cravings','Acne']},
+  fertile:{feel:"Estrogen is near its peak and libido often lifts. You may notice clearer, stretchy discharge along with more energy and confidence.",
+    symptoms:['Cravings','Tender breasts','Bloating']},
+  ovulation:{feel:"Estrogen peaks and LH surges to release the egg. Many feel their most energetic and social; some notice a brief twinge on one side.",
+    symptoms:['Cramps','Tender breasts']},
+  luteal:{feel:"Progesterone dominates, then both hormones fall toward your period. Energy tends to taper and PMS — cravings, bloating, mood shifts — is common in the days before.",
+    symptoms:['Cravings','Bloating','Tender breasts','Fatigue','Acne','Headache']},
+};
+
+// Which cycle phase a past logged day fell in — classified against *its own* cycle (the
+// period start that encloses it and that cycle's real length), so history from earlier
+// cycles is bucketed correctly rather than through today's predictions.
+function phaseOnDate(dateStr){
+  const starts=periodStarts(); if(!starts.length)return null;
+  const plens=periodLengths();
+  let idx=-1;
+  for(let i=0;i<starts.length;i++){if(starts[i]<=dateStr)idx=i;else break;}
+  if(idx<0)return null;
+  const start=starts[idx], next=starts[idx+1];
+  const cyc=next?daysBetween(start,next):avgCycle();
+  const per=Math.min(plens[idx]||avgPeriod(),cyc);
+  const day=daysBetween(start,dateStr)+1;
+  if(day<1)return null;
+  return histDayPhase(Math.min(day,cyc),cyc,per);
+}
+
+function renderTodayBody(){
+  const el=$('#todayBody'); if(!el)return;
+  const cd=cycleDay(), ph=dayPhase(today());
+  if(!cd||!ph){
+    el.innerHTML=`<div class="insight-empty">Log a period and check in daily, and Today will show where your hormones stand right now and what you're likely to feel. In general, energy tends to climb in the two weeks after your period and dip in the week before it.</div>`;
+    return;
+  }
+  // 1) Hormones right now — a compact meter per hormone at today's cycle day.
+  const rows=hormoneLevels(cd).map(h=>{
+    const state=h.trend==='peaking'?'At its peak':h.trend==='steady'?h.mag:`${h.mag} · ${h.trend}`;
+    return `<div class="horm-row">
+      <span class="horm-name">${h.name}</span>
+      <span class="horm-meter"><span class="horm-fill" style="width:${Math.round(h.lvl*100)}%;background:${HORM_COLORS[h.name]}"></span></span>
+      <span class="horm-state">${state}</span></div>`;
+  }).join('');
+  let html=`<div class="insight-card"><div class="ic-label">Hormones right now</div><div class="horm">${rows}</div></div>`;
+
+  // 2) What to expect — the phase's general "how you may feel" line, with symptom chips that
+  // switch to *your* most-logged symptoms for this phase once you've logged any of them
+  // twice or more (so it's your pattern, not a textbook list).
+  const base=PHASE_BODY[ph];
+  const tally={};
+  Object.values(DAYS).forEach(d=>{
+    if(d.date===today())return;
+    if(phaseOnDate(d.date)!==ph)return;
+    (d.symptoms||[]).forEach(s=>tally[s]=(tally[s]||0)+1);
+  });
+  const personal=Object.entries(tally).filter(([,n])=>n>=2).sort((a,b)=>b[1]-a[1]).map(([s])=>s).slice(0,5);
+  const usePersonal=personal.length>0;
+  const tags=(usePersonal?personal:base.symptoms).map(s=>`<span class="sym-tag">${s}</span>`).join('');
+  html+=`<div class="insight-card"><div class="ic-label">What to expect</div>
+    <p>${base.feel}</p>
+    <div class="sym-caption">${usePersonal?'You often log around now':'Common in this phase'}</div>
+    <div class="sym-tags">${tags}</div></div>`;
+
+  el.innerHTML=html;
 }
 
 /* ================= RENDER: HEADER ================= */
@@ -757,7 +854,7 @@ function renderInsights(){
   el.innerHTML=html;
 }
 
-function renderAll(){renderHeader();renderRing();renderStats();renderCalendar();renderHistory();}
+function renderAll(){renderHeader();renderRing();renderTodayBody();renderCalendar();renderHistory();}
 
 /* ================= LOG SHEET ================= */
 const SYMPTOMS=['Cramps','Headache','Bloating','Tender breasts','Backache','Nausea','Fatigue','Cravings','Acne'];
@@ -984,6 +1081,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:20,ts:'2026-07-14T12:00:00-04:00',tag:'New',title:'Your body, today',
+   body:'Today now shows what’s going on with your body right now instead of countdowns. A “Hormones right now” card reads where your estrogen, progesterone, LH and FSH stand — and which way they’re heading — scaled to your own cycle. Below it, “What to expect” describes how you may feel in this phase, with the symptoms you most often log around now (or the common ones for the phase until you’ve logged enough). What’s coming next still lives in Your Body → Insights.'},
   {id:19,ts:'2026-07-14T00:20:00-04:00',tag:'Improved',title:'Clearer countdowns on Today',
    body:'The three stats on Today now read “in 4d” instead of just “4d”, so it’s obvious each number is the days until your fertile window, ovulation, or next period — not days into them.'},
   {id:18,ts:'2026-07-12T18:40:00-04:00',tag:'Improved',title:'Today is now about your current cycle',
