@@ -302,9 +302,9 @@ nav button svg{width:22px;height:22px}
     <button class="cta" id="checkinBtn">Daily check-in</button>
 
     <div class="stats">
-      <div class="stat"><b id="stAvg">–</b><small>avg cycle</small></div>
-      <div class="stat"><b id="stPeriod">–</b><small>avg period</small></div>
-      <div class="stat"><b id="stNext">–</b><small>next in</small></div>
+      <div class="stat"><b id="stFertile">–</b><small>fertile</small></div>
+      <div class="stat"><b id="stOvul">–</b><small>ovulation</small></div>
+      <div class="stat"><b id="stNext">–</b><small>next period</small></div>
     </div>
 
     <div class="sec-title">This month</div>
@@ -550,13 +550,22 @@ function renderRing(){
 }
 
 /* ================= RENDER: STATS ================= */
+// The Today strip is about the *current* cycle, not long-run averages (those live in
+// Your Body → Insights). Three forward-looking states, all read straight from predictions():
+// where the fertile window stands, when ovulation is, and when the next period is due.
 function renderStats(){
-  $('#stAvg').textContent=cycleLengths().length?avgCycle()+'d':'–';
-  $('#stPeriod').textContent=completedPeriodLengths().length?avgPeriod()+'d':'–';
-  const p=predictions();
-  if(p){const n=daysBetween(today(),p.nextStart);
-    $('#stNext').textContent=n>0?n+'d':(n===0?'today':'now');}
-  else $('#stNext').textContent='–';
+  const p=predictions(); const t=today();
+  if(!p){$('#stFertile').textContent='–';$('#stOvul').textContent='–';$('#stNext').textContent='–';return;}
+  // Fertile window: counting down to it, open right now, or already behind us this cycle.
+  if(t<p.fertileStart){const n=daysBetween(t,p.fertileStart);$('#stFertile').textContent=n+'d';}
+  else if(t<=p.fertileEnd)$('#stFertile').textContent='open';
+  else $('#stFertile').textContent='closed';
+  // Ovulation: days until, the day itself, or passed.
+  const o=daysBetween(t,p.ovul);
+  $('#stOvul').textContent=o>0?o+'d':(o===0?'today':'passed');
+  // Next period: days until, due today, or overdue.
+  const n=daysBetween(t,p.nextStart);
+  $('#stNext').textContent=n>0?n+'d':(n===0?'today':'late');
 }
 
 /* ================= RENDER: HEADER ================= */
@@ -973,6 +982,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:18,ts:'2026-07-12T18:40:00-04:00',tag:'Improved',title:'Today is now about your current cycle',
+   body:'The Today tab focuses on what’s happening right now and what’s next: the three stats up top are your fertile window (opening soon, open now, or closed), your ovulation day, and your next period — instead of long-run averages. Your average cycle and period length now live in Your Body → Insights, alongside your regularity and a typical cycle.'},
   {id:17,ts:'2026-07-12T18:05:00-04:00',tag:'Fix',title:'Nav bar always sits at the bottom',
    body:'On some phones the bottom tab bar could float up into the middle of the screen with a big blank area beneath it. The layout now fills the screen exactly, with only the content scrolling, so Today · Your Body · Settings always stays put at the bottom.'},
   {id:16,ts:'2026-07-12T17:35:00-04:00',tag:'Fix',title:'No more blank space at the bottom',
