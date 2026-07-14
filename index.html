@@ -556,16 +556,18 @@ function renderRing(){
 function renderStats(){
   const p=predictions(); const t=today();
   if(!p){$('#stFertile').textContent='–';$('#stOvul').textContent='–';$('#stNext').textContent='–';return;}
+  // Countdowns read "in Nd" so it's clear the number is days *until* the event, not days
+  // into it; the plain state words (open/today/…) are already unambiguous on their own.
   // Fertile window: counting down to it, open right now, or already behind us this cycle.
-  if(t<p.fertileStart){const n=daysBetween(t,p.fertileStart);$('#stFertile').textContent=n+'d';}
+  if(t<p.fertileStart){const n=daysBetween(t,p.fertileStart);$('#stFertile').textContent='in '+n+'d';}
   else if(t<=p.fertileEnd)$('#stFertile').textContent='open';
   else $('#stFertile').textContent='closed';
   // Ovulation: days until, the day itself, or passed.
   const o=daysBetween(t,p.ovul);
-  $('#stOvul').textContent=o>0?o+'d':(o===0?'today':'passed');
+  $('#stOvul').textContent=o>0?'in '+o+'d':(o===0?'today':'passed');
   // Next period: days until, due today, or overdue.
   const n=daysBetween(t,p.nextStart);
-  $('#stNext').textContent=n>0?n+'d':(n===0?'today':'late');
+  $('#stNext').textContent=n>0?'in '+n+'d':(n===0?'today':'late');
 }
 
 /* ================= RENDER: HEADER ================= */
@@ -982,6 +984,8 @@ $('#scienceLink').onclick=openScience;
 // -04:00 EDT or -05:00 EST offset). Anything with an id above the reader's last-seen id
 // shows as an unread badge. tag: 'New' (feature), 'Improved' (enhancement) or 'Fix'.
 const UPDATES=[
+  {id:19,ts:'2026-07-14T00:20:00-04:00',tag:'Improved',title:'Clearer countdowns on Today',
+   body:'The three stats on Today now read “in 4d” instead of just “4d”, so it’s obvious each number is the days until your fertile window, ovulation, or next period — not days into them.'},
   {id:18,ts:'2026-07-12T18:40:00-04:00',tag:'Improved',title:'Today is now about your current cycle',
    body:'The Today tab focuses on what’s happening right now and what’s next: the three stats up top are your fertile window (opening soon, open now, or closed), your ovulation day, and your next period — instead of long-run averages. Your average cycle and period length now live in Your Body → Insights, alongside your regularity and a typical cycle.'},
   {id:17,ts:'2026-07-12T18:05:00-04:00',tag:'Fix',title:'Nav bar always sits at the bottom',
